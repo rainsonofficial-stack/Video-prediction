@@ -13,11 +13,13 @@
         .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; width: 90%; }
         .num-btn { padding: 30px; background: #0a0a0a; border: 1px solid #222; color: #fff; font-size: 1.5rem; border-radius: 10px; }
         
-        /* White Send Button */
         .send-btn { background: #fff !important; color: #000 !important; font-weight: bold; }
         
         .back-nav { position: absolute; top: 15px; left: 15px; padding: 10px; color: #888; border: 1px solid #333; border-radius: 5px; }
-        #peek-display { position: absolute; bottom: 40px; left: 40px; color: #222; font-size: 2.5rem; display: none; }
+        
+        /* 1. Peek text reduced by 50% (from 2.5rem to 1.25rem) */
+        #peek-display { position: absolute; bottom: 40px; left: 40px; color: rgba(120,120,120,0.3); font-size: 1.25rem; display: none; pointer-events: none; }
+        
         .corner { position: absolute; width: 30%; height: 25%; z-index: 100; background: transparent; }
     </style>
 </head>
@@ -53,6 +55,7 @@
         let connections = [];
         let currentInput = "";
         let swipePath = [];
+        let holdTimer; // Timer for the 2-second hold
 
         peer.on('open', () => document.getElementById('status').innerText = "System Live");
         peer.on('connection', conn => {
@@ -83,33 +86,35 @@
         }
 
         function sendData() {
+            if (currentInput === "") return;
             const msg = "video" + currentInput;
             connections.forEach(c => { if(c.open) c.send(msg); });
-            vibrate(500);
+            vibrate(500); // Long vibration confirms send
             currentInput = "";
             document.getElementById('btn-display').innerText = "_";
+            document.getElementById('peek-display').innerText = "_";
         }
 
-        let startX, startY, startTime;
+        let startX, startY;
         const gScreen = document.getElementById('gesture-screen');
 
         gScreen.addEventListener('touchstart', e => {
             startX = e.touches[0].clientX;
             startY = e.touches[0].clientY;
-            startTime = Date.now();
+            
+            // 2. Start timer: Send once hold reaches 2000ms (before let go)
+            holdTimer = setTimeout(() => {
+                sendData();
+            }, 2000);
         });
 
         gScreen.addEventListener('touchend', e => {
+            // Cancel the hold-to-send timer if the user lets go early
+            clearTimeout(holdTimer);
+
             const dx = e.changedTouches[0].clientX - startX;
             const dy = e.changedTouches[0].clientY - startY;
-            const duration = Date.now() - startTime;
             const dist = Math.sqrt(dx*dx + dy*dy);
-
-            // Send: Hold 2s
-            if (dist < 10 && duration > 2000) { sendData(); return; }
-
-            // Triple Tap Clear
-            // Logic handled via the multi-tap function below
 
             if (dist > 15) {
                 let dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
@@ -123,7 +128,7 @@
             }
         });
 
-        // Specialized Tap Handler
+        // Corner Tap Logic
         function handleMultiTap(element, targetCount, callback) {
             let count = 0, timer;
             element.addEventListener('click', () => {
@@ -136,9 +141,9 @@
             });
         }
 
-        handleMultiTap(gScreen, 3, clearInput); // Triple Tap Screen -> Clear
-        handleMultiTap(document.getElementById('back-zone'), 2, () => showScreen('setup-screen')); // Double Tap Bottom Left -> Home
-        handleMultiTap(document.getElementById('peek-zone'), 2, () => { // Double Tap Bottom Right -> Peek
+        handleMultiTap(gScreen, 3, clearInput);
+        handleMultiTap(document.getElementById('back-zone'), 2, () => showScreen('setup-screen'));
+        handleMultiTap(document.getElementById('peek-zone'), 2, () => {
             const p = document.getElementById('peek-display');
             p.style.display = p.style.display === 'block' ? 'none' : 'block';
         });
@@ -146,3 +151,4 @@
     </script>
 </body>
 </html>
+
