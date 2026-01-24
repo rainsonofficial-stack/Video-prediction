@@ -6,21 +6,24 @@
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
     <style>
-        body { margin: 0; background: #000; color: #444; font-family: sans-serif; touch-action: none; }
-        .screen { display: none; height: 100vh; width: 100vw; flex-direction: column; align-items: center; justify-content: center; }
+        body { margin: 0; background: #000; color: #444; font-family: sans-serif; touch-action: none; overflow: hidden; }
+        .screen { display: none; height: 100vh; width: 100vw; flex-direction: column; align-items: center; justify-content: center; position: relative; }
         .active { display: flex; }
         .mode-btn { padding: 25px; width: 80%; margin: 10px; background: #111; color: #666; border: 1px solid #333; border-radius: 10px; font-size: 1.2rem; }
         
         .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; width: 90%; }
         .num-btn { padding: 30px; background: #0a0a0a; border: 1px solid #222; color: #fff; font-size: 1.5rem; border-radius: 10px; }
-        
         .send-btn { background: #fff !important; color: #000 !important; font-weight: bold; }
         
-        .back-nav { position: absolute; top: 15px; left: 15px; padding: 10px; color: #888; border: 1px solid #333; border-radius: 5px; }
+        /* Button Mode Top-Right Display */
+        #top-right-display { position: absolute; top: 15px; right: 15px; color: #555; font-size: 1.5rem; font-family: monospace; }
         
-        #peek-display { position: absolute; bottom: 40px; left: 40px; color: rgba(120,120,120,0.3); font-size: 1.25rem; display: none; pointer-events: none; }
+        .back-nav { position: absolute; top: 15px; left: 15px; padding: 10px; color: #444; border: 1px solid #222; border-radius: 5px; }
         
-        .corner { position: absolute; width: 30%; height: 25%; z-index: 100; background: transparent; }
+        /* Swipe Mode Peek Display */
+        #peek-display { position: absolute; bottom: 110px; right: 40px; color: rgba(120,120,120,0.5); font-size: 1.8rem; display: none; pointer-events: none; border: 1px solid rgba(255,255,255,0.1); padding: 5px 15px; border-radius: 5px; }
+        
+        .corner { position: absolute; width: 40%; height: 30%; z-index: 100; background: transparent; }
     </style>
 </head>
 <body>
@@ -32,8 +35,9 @@
     </div>
 
     <div id="button-screen" class="screen">
+        <div id="top-right-display">_</div>
         <div class="back-nav" onclick="showScreen('setup-screen')">Back</div>
-        <div style="color:#333; font-size: 2rem; margin-bottom: 20px;" id="btn-display">_</div>
+        <div style="color:#333; font-size: 3rem; margin-bottom: 20px;" id="btn-display">_</div>
         <div class="grid">
             <button class="num-btn" onclick="addDigit(7)">7</button><button class="num-btn" onclick="addDigit(8)">8</button><button class="num-btn" onclick="addDigit(9)">9</button>
             <button class="num-btn" onclick="addDigit(4)">4</button><button class="num-btn" onclick="addDigit(5)">5</button><button class="num-btn" onclick="addDigit(6)">6</button>
@@ -50,7 +54,6 @@
     </div>
 
     <script>
-        // --- YOUR UPDATED FIREBASE CONFIG ---
         const firebaseConfig = {
             apiKey: "AIzaSyDxPQYrMlOslsqJeHnfj2MSpROZfaAwVH0",
             authDomain: "rainson-magic.firebaseapp.com",
@@ -61,17 +64,11 @@
             appId: "1:290150598500:web:4fbe7642b2baf839609c71"
         };
 
-        // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // Check connection
-        db.ref('.info/connected').on('value', (snap) => {
-            if (snap.val() === true) {
-                document.getElementById('status').innerText = "System Live (Cloud)";
-            } else {
-                document.getElementById('status').innerText = "Connecting...";
-            }
+        db.ref('.info/connected').on('value', snap => {
+            document.getElementById('status').innerText = snap.val() ? "System Live (Cloud)" : "Connecting...";
         });
 
         let currentInput = "";
@@ -87,35 +84,32 @@
 
         function addDigit(d) {
             currentInput += d;
-            document.getElementById('btn-display').innerText = currentInput;
-            document.getElementById('peek-display').innerText = currentInput;
+            updateDisplays();
             vibrate(50);
+        }
+
+        function updateDisplays() {
+            const val = currentInput || "_";
+            document.getElementById('btn-display').innerText = val;
+            document.getElementById('top-right-display').innerText = val;
+            document.getElementById('peek-display').innerText = val;
         }
 
         function clearInput() {
             currentInput = "";
             swipePath = [];
-            document.getElementById('btn-display').innerText = "_";
-            document.getElementById('peek-display').innerText = "_";
+            updateDisplays();
             vibrate([60, 40, 60]); 
         }
 
         function sendData() {
             if (currentInput === "") return;
-            const msg = "video" + currentInput;
+            // Send timestamp so the spectator page knows when the "timer" starts
+            db.ref('currentVideo').set("video" + currentInput);
+            db.ref('lastSentTime').set(Date.now());
             
-            // SEND TO CLOUD
-            db.ref('currentVideo').set(msg)
-                .then(() => {
-                    vibrate(500); // Confirmation vibration
-                    currentInput = "";
-                    document.getElementById('btn-display').innerText = "_";
-                    document.getElementById('peek-display').innerText = "_";
-                })
-                .catch((error) => {
-                    console.error("Cloud Error: ", error);
-                    alert("Sync Error. Check your Rules.");
-                });
+            vibrate(400);
+            clearInput();
         }
 
         let startX, startY;
@@ -124,21 +118,14 @@
         gScreen.addEventListener('touchstart', e => {
             startX = e.touches[0].clientX;
             startY = e.touches[0].clientY;
-            
-            // Hold for 2 seconds to send
-            holdTimer = setTimeout(() => {
-                sendData();
-            }, 2000);
+            holdTimer = setTimeout(sendData, 2000);
         });
 
         gScreen.addEventListener('touchend', e => {
             clearTimeout(holdTimer);
-
             const dx = e.changedTouches[0].clientX - startX;
             const dy = e.changedTouches[0].clientY - startY;
-            const dist = Math.sqrt(dx*dx + dy*dy);
-
-            if (dist > 15) {
+            if (Math.sqrt(dx*dx + dy*dy) > 20) {
                 let dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
                 swipePath.push(dir);
                 if (swipePath.length === 2) {
@@ -150,7 +137,6 @@
             }
         });
 
-        // Corner Tap Logic
         function handleMultiTap(element, targetCount, callback) {
             let count = 0, timer;
             element.addEventListener('click', () => {
@@ -159,7 +145,7 @@
                 timer = setTimeout(() => {
                     if (count === targetCount) callback();
                     count = 0;
-                }, 350);
+                }, 300);
             });
         }
 
@@ -167,9 +153,9 @@
         handleMultiTap(document.getElementById('back-zone'), 2, () => showScreen('setup-screen'));
         handleMultiTap(document.getElementById('peek-zone'), 2, () => {
             const p = document.getElementById('peek-display');
-            p.style.display = p.style.display === 'block' ? 'none' : 'block';
+            p.style.display = (p.style.display === 'block') ? 'none' : 'block';
+            vibrate(30);
         });
-
     </script>
 </body>
 </html>
