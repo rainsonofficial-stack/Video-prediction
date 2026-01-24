@@ -4,21 +4,27 @@
     <title>The Gallery</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { margin: 0; background: black; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-        canvas { max-width: 100%; max-height: 100%; }
-        #id-display { position: fixed; top: 10px; left: 10px; color: rgba(255,255,255,0.3); font-family: monospace; font-size: 12px; z-index: 100; }
+        body { margin: 0; background: #111; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .video-container { width: 70%; position: relative; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
+        canvas { width: 100%; display: block; border-radius: 8px; }
+        /* Hidden UI */
+        #status { position: fixed; bottom: 5px; right: 5px; color: #222; font-size: 10px; }
     </style>
 </head>
 <body>
-    <div id="id-display">Initializing...</div>
-    <canvas id="magicCanvas" width="1280" height="720"></canvas>
+    <div id="status">Connecting...</div>
+    <div class="video-container">
+        <canvas id="magicCanvas" width="1280" height="720"></canvas>
+        <div style="text-align: center; margin-top: 10px;">
+            <button onclick="togglePlay()" style="background:none; border:1px solid #444; color:white; padding:5px 15px; cursor:pointer;">Play/Pause</button>
+        </div>
+    </div>
 
     <script>
         const canvas = document.getElementById('magicCanvas');
         const ctx = canvas.getContext('2d');
-        const idDisplay = document.getElementById('id-display');
+        const ROOM_ID = "magic-room-rainson"; // HARDCODED ROOM NAME
 
-        // Mapping signals to your actual Cloudinary URLs
         const videoMap = {
             'video1': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769255934/lv_0_20260124172742_nqtx0o.mp4',
             'video2': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769255963/lv_0_20260124172757_wdysqo.mp4'
@@ -26,52 +32,51 @@
 
         let activeVideo = document.createElement('video');
         activeVideo.src = videoMap['video1'];
-        activeVideo.loop = true; activeVideo.muted = true; activeVideo.playsInline = true;
-        activeVideo.crossOrigin = "anonymous"; // Required for Canvas
+        activeVideo.loop = true; activeVideo.muted = false; activeVideo.playsInline = true;
+        activeVideo.crossOrigin = "anonymous";
         activeVideo.play();
 
         let hiddenVideo = document.createElement('video');
-        hiddenVideo.muted = true; hiddenVideo.playsInline = true;
+        hiddenVideo.muted = false; hiddenVideo.playsInline = true;
         hiddenVideo.crossOrigin = "anonymous";
 
-        // PeerJS Setup
+        // Connection Logic
         const peer = new Peer();
-        peer.on('open', id => { idDisplay.innerText = "ID: " + id; });
+        peer.on('open', (id) => {
+            document.getElementById('status').innerText = "Ready";
+            // Connect to the room (The remote will find us)
+            const conn = peer.connect(ROOM_ID);
+            setupConn(conn);
+        });
 
-        peer.on('connection', conn => {
+        // If the remote connects to us
+        peer.on('connection', setupConn);
+
+        function setupConn(conn) {
             conn.on('data', data => {
-                // data will be "video1" or "video2" from your remote
                 if (videoMap[data]) {
-                    const nextSrc = videoMap[data];
-                    
-                    // Pre-syncing logic
-                    hiddenVideo.src = nextSrc;
+                    hiddenVideo.src = videoMap[data];
                     hiddenVideo.currentTime = activeVideo.currentTime;
-                    
                     hiddenVideo.oncanplaythrough = () => {
-                        if (!activeVideo.paused) hiddenVideo.play();
-                        // Seamlessly swap the reference the canvas is drawing from
-                        activeVideo = hiddenVideo; 
-                        
-                        // Prepare the "other" video element for the next swap
+                        const wasPaused = activeVideo.paused;
+                        activeVideo = hiddenVideo;
+                        if (!wasPaused) activeVideo.play();
                         hiddenVideo = document.createElement('video');
-                        hiddenVideo.muted = true;
-                        hiddenVideo.crossOrigin = "anonymous";
                     };
                 }
             });
-        });
+        }
 
-        // The Canvas Painting Loop
+        function togglePlay() {
+            if (activeVideo.paused) activeVideo.play();
+            else activeVideo.pause();
+        }
+
         function render() {
             ctx.drawImage(activeVideo, 0, 0, canvas.width, canvas.height);
             requestAnimationFrame(render);
         }
         render();
-
-        // Allow clicking the canvas to "Start" (Browsers often block auto-play)
-        canvas.addEventListener('click', () => activeVideo.play());
     </script>
 </body>
 </html>
-
