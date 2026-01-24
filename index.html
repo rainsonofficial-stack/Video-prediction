@@ -6,22 +6,51 @@
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Playfair+Display:ital@0;1&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; background: #0a0a0a; color: #d4af37; font-family: 'Playfair Display', serif; display: flex; flex-direction: column; min-height: 100vh; overflow-x: hidden; }
-        .header { text-align: center; padding: 120px 20px; background: linear-gradient(rgba(10,10,10,0.7), rgba(10,10,10,0.7)), url('illusion.jpg'); background-size: cover; background-position: center; width: 100%; box-sizing: border-box; }
-        h1 { font-family: 'Cinzel', serif; font-size: 3.5rem; margin-bottom: 5px; letter-spacing: 6px; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.8); }
-        .enquire-btn { display: inline-block; padding: 12px 30px; border: 1px solid #d4af37; color: #d4af37; text-decoration: none; font-size: 0.9rem; letter-spacing: 3px; transition: 0.3s; margin-top: 20px; background: rgba(0,0,0,0.5); }
-        .enquire-btn:hover { background: #d4af37; color: #000; }
-        .spacer { flex-grow: 1; }
-        .content { text-align: center; width: 70%; margin: 0 auto 80px auto; position: relative; }
-        .intro-text { font-style: italic; color: #aaa; margin-bottom: 10px; font-size: 1.2rem; }
-        .symbols { font-size: 1.5rem; letter-spacing: 15px; margin-bottom: 20px; color: #fff; }
-        .video-container { position: relative; width: 100%; border-radius: 2px; box-shadow: 0 20px 50px rgba(0,0,0,0.9); background: #000; }
+        /* Forces the page to stay on one screen with no scrolling */
+        html, body { 
+            margin: 0; padding: 0; height: 100vh; width: 100vw; 
+            overflow: hidden; background: #0a0a0a; color: #d4af37; 
+            font-family: 'Playfair Display', serif;
+            display: flex; flex-direction: column;
+        }
+
+        /* Header image fits without cropping */
+        .header { 
+            height: 25vh; width: 100%;
+            background: linear-gradient(rgba(10,10,10,0.5), rgba(10,10,10,0.5)), url('illusion.jpg'); 
+            background-size: contain; 
+            background-repeat: no-repeat;
+            background-position: center;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+
+        h1 { font-family: 'Cinzel', serif; font-size: 1.8rem; margin: 0; letter-spacing: 4px; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.8); }
+        .enquire-btn { padding: 8px 20px; border: 1px solid #d4af37; color: #d4af37; text-decoration: none; font-size: 0.7rem; letter-spacing: 2px; margin-top: 10px; background: rgba(0,0,0,0.5); }
+
+        /* Main content area pulled up */
+        .content { 
+            flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            width: 90%; margin: 0 auto;
+        }
+
+        .intro-text { font-style: italic; color: #aaa; font-size: 1rem; margin-bottom: 5px; }
+        
+        /* Card Symbol Colors */
+        .symbols { font-size: 1.5rem; letter-spacing: 15px; margin-bottom: 15px; }
+        .red { color: #ff4d4d; }   /* Hearts/Diamonds */
+        .black { color: #ffffff; } /* Spades/Clubs (Visible on dark) */
+
+        .video-container { position: relative; width: 100%; max-width: 500px; border: 1px solid #222; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
         canvas { width: 100%; display: block; }
-        .ui-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; transition: opacity 0.5s ease; opacity: 1; z-index: 10; }
+        
+        /* UI Overlay */
+        .ui-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; transition: opacity 0.5s; opacity: 1; }
         .ui-hidden { opacity: 0; }
-        #playBtn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.6); border: 1px solid #fff; color: white; width: 80px; height: 80px; border-radius: 50%; font-size: 28px; cursor: pointer; pointer-events: auto; }
-        #progress-bar { position: absolute; bottom: 30px; left: 5%; width: 90%; accent-color: #fff; cursor: pointer; pointer-events: auto; }
-        .footer { width: 100%; text-align: center; padding-bottom: 30px; color: #444; font-size: 0.75rem; font-family: sans-serif; letter-spacing: 2px; }
+        #playBtn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.6); border: 1px solid #fff; color: white; width: 60px; height: 60px; border-radius: 50%; font-size: 20px; cursor: pointer; pointer-events: auto; }
+        #progress-bar { position: absolute; bottom: 20px; left: 5%; width: 90%; accent-color: #fff; pointer-events: auto; }
+
+        .footer { height: 40px; text-align: center; color: #444; font-size: 0.7rem; letter-spacing: 2px; flex-shrink: 0; }
     </style>
 </head>
 <body>
@@ -29,10 +58,12 @@
         <h1>Luxury Illusionist</h1>
         <a href="mailto:management@rainsonofficial.com" class="enquire-btn">ENQUIRE NOW</a>
     </div>
-    <div class="spacer"></div>
+
     <div class="content">
         <div class="intro-text">I made a video for you....</div>
-        <div class="symbols">♠ ♥ ♣ ♦</div>
+        <div class="symbols">
+            <span class="black">♠</span> <span class="red">♥</span> <span class="black">♣</span> <span class="red">♦</span>
+        </div>
         <div class="video-container">
             <canvas id="magicCanvas" width="1280" height="720"></canvas>
             <div class="ui-overlay" id="uiOverlay">
@@ -41,6 +72,7 @@
             </div>
         </div>
     </div>
+
     <div class="footer" id="footerText">♤rainsonofficial</div>
 
     <script>
@@ -65,34 +97,26 @@
 
         let activeVideo = document.createElement('video');
         activeVideo.loop = true; activeVideo.muted = false; activeVideo.playsInline = true; activeVideo.crossOrigin = "anonymous";
-        
         let hiddenVideo = document.createElement('video');
         hiddenVideo.muted = false; hiddenVideo.playsInline = true; hiddenVideo.crossOrigin = "anonymous";
 
-        // Listen for Cloud Changes
         db.ref('currentVideo').on('value', (snapshot) => {
             const val = snapshot.val() || 'video1';
-            
-            // Branding change when connected
+            // Connection Indicator
             document.getElementById('footerText').innerText = "♤rainsonofficial.com";
             
-            // If already playing this video, do nothing
             if (activeVideo.src.includes(videoMap[val])) {
                 if (!activeVideo.src) activeVideo.src = videoMap[val];
                 return;
             }
 
-            // Perform Invisible Swap
             const isPlaying = !activeVideo.paused;
             hiddenVideo.src = videoMap[val];
             hiddenVideo.currentTime = activeVideo.currentTime || 0;
-            
             hiddenVideo.oncanplaythrough = () => {
                 activeVideo.pause();
                 activeVideo = hiddenVideo;
                 if (isPlaying) activeVideo.play().catch(e => {});
-                
-                // Refresh hidden element for next swap
                 hiddenVideo = document.createElement('video');
                 hiddenVideo.muted = false; hiddenVideo.playsInline = true; hiddenVideo.crossOrigin = "anonymous";
             };
@@ -100,26 +124,16 @@
 
         function togglePlay(e) { 
             e.stopPropagation(); 
-            const btn = document.getElementById('playBtn');
-            if (activeVideo.paused) { 
-                activeVideo.play(); 
-                btn.innerHTML = "||"; 
-            } else { 
-                activeVideo.pause(); 
-                btn.innerHTML = "&#9654;"; 
-            } 
+            if (activeVideo.paused) { activeVideo.play(); playBtn.innerHTML = "||"; } 
+            else { activeVideo.pause(); playBtn.innerHTML = "&#9654;"; } 
         }
         
         let hideTimeout;
         function showUI() { 
-            document.getElementById('uiOverlay').classList.remove('ui-hidden'); 
+            uiOverlay.classList.remove('ui-hidden'); 
             clearTimeout(hideTimeout); 
-            hideTimeout = setTimeout(() => { 
-                if (!activeVideo.paused) document.getElementById('uiOverlay').classList.add('ui-hidden'); 
-            }, 1500); 
+            hideTimeout = setTimeout(() => { if (!activeVideo.paused) uiOverlay.classList.add('ui-hidden'); }, 1500); 
         }
-        
-        canvas.addEventListener('mousemove', showUI);
         canvas.addEventListener('touchstart', showUI);
         
         function render() {
