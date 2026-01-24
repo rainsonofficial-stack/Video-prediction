@@ -15,13 +15,21 @@
         .num-btn { padding: 30px; background: #0a0a0a; border: 1px solid #222; color: #fff; font-size: 1.5rem; border-radius: 10px; }
         .send-btn { background: #fff !important; color: #000 !important; font-weight: bold; }
         
-        /* Button Mode Top-Right Display */
+        /* Persistent Top-Right Display */
         #top-right-display { position: absolute; top: 15px; right: 15px; color: #555; font-size: 1.5rem; font-family: monospace; }
         
         .back-nav { position: absolute; top: 15px; left: 15px; padding: 10px; color: #444; border: 1px solid #222; border-radius: 5px; }
         
-        /* Swipe Mode Peek Display */
-        #peek-display { position: absolute; bottom: 110px; right: 40px; color: rgba(120,120,120,0.5); font-size: 1.8rem; display: none; pointer-events: none; border: 1px solid rgba(255,255,255,0.1); padding: 5px 15px; border-radius: 5px; }
+        /* Double Peek at Bottom Left */
+        #peek-container { 
+            position: absolute; bottom: 40px; left: 20px; 
+            display: none; flex-direction: column; pointer-events: none; 
+            font-family: monospace; border-left: 2px solid #333; padding-left: 10px;
+        }
+        .peek-label { font-size: 0.7rem; color: #444; text-transform: uppercase; margin-bottom: -5px; }
+        .peek-val { font-size: 1.8rem; margin-bottom: 10px; }
+        #peek-last { color: #555; }
+        #peek-current { color: #888; }
         
         .corner { position: absolute; width: 40%; height: 30%; z-index: 100; background: transparent; }
     </style>
@@ -50,7 +58,13 @@
     <div id="gesture-screen" class="screen">
         <div class="corner" style="bottom:0; left:0" id="back-zone"></div>
         <div class="corner" style="bottom:0; right:0" id="peek-zone"></div>
-        <div id="peek-display">_</div>
+        
+        <div id="peek-container">
+            <div class="peek-label">Last Sent</div>
+            <div class="peek-val" id="peek-last">_</div>
+            <div class="peek-label">Current</div>
+            <div class="peek-val" id="peek-current">_</div>
+        </div>
     </div>
 
     <script>
@@ -67,13 +81,14 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        db.ref('.info/connected').on('value', snap => {
-            document.getElementById('status').innerText = snap.val() ? "System Live (Cloud)" : "Connecting...";
-        });
-
         let currentInput = "";
+        let lastSentValue = "_";
         let swipePath = [];
         let holdTimer;
+
+        db.ref('.info/connected').on('value', snap => {
+            document.getElementById('status').innerText = snap.val() ? "System Live" : "Connecting...";
+        });
 
         function showScreen(id) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -89,10 +104,11 @@
         }
 
         function updateDisplays() {
-            const val = currentInput || "_";
-            document.getElementById('btn-display').innerText = val;
-            document.getElementById('top-right-display').innerText = val;
-            document.getElementById('peek-display').innerText = val;
+            document.getElementById('btn-display').innerText = currentInput || "_";
+            document.getElementById('peek-current').innerText = currentInput || "_";
+            // Top Right and Peek Last only change when SEND happens
+            document.getElementById('top-right-display').innerText = lastSentValue;
+            document.getElementById('peek-last').innerText = lastSentValue;
         }
 
         function clearInput() {
@@ -104,12 +120,14 @@
 
         function sendData() {
             if (currentInput === "") return;
-            // Send timestamp so the spectator page knows when the "timer" starts
+            
+            lastSentValue = currentInput; // Store before clearing
             db.ref('currentVideo').set("video" + currentInput);
             db.ref('lastSentTime').set(Date.now());
             
             vibrate(400);
-            clearInput();
+            currentInput = ""; // Clear input
+            updateDisplays(); // Refresh displays
         }
 
         let startX, startY;
@@ -152,8 +170,8 @@
         handleMultiTap(gScreen, 3, clearInput);
         handleMultiTap(document.getElementById('back-zone'), 2, () => showScreen('setup-screen'));
         handleMultiTap(document.getElementById('peek-zone'), 2, () => {
-            const p = document.getElementById('peek-display');
-            p.style.display = (p.style.display === 'block') ? 'none' : 'block';
+            const p = document.getElementById('peek-container');
+            p.style.display = (p.style.display === 'flex') ? 'none' : 'flex';
             vibrate(30);
         });
     </script>
