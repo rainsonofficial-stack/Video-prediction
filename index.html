@@ -12,9 +12,10 @@
             font-family: 'Playfair Display', serif;
             display: flex; flex-direction: column;
             align-items: center;
+            overflow-x: hidden;
         }
 
-        /* HEADER STACK - ZERO CROP */
+        /* HEADER STACK - NO CROPPING */
         .header-stack { position: relative; width: 100%; line-height: 0; }
         .base-img { width: 100%; height: auto; display: block; }
 
@@ -23,11 +24,10 @@
             background: rgba(0, 0, 0, 0.6); 
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             text-align: center; line-height: normal;
-            padding-top: 50px; /* Pushes text down by 50px */
+            padding-top: 50px; 
             box-sizing: border-box;
         }
 
-        /* INCREASED FONT SIZES */
         h1 { font-family: 'Cinzel', serif; font-size: 2.8rem; margin: 0; letter-spacing: 4px; color: #fff; text-shadow: 0 2px 15px rgba(0,0,0,1); }
         .enquire-btn { display: inline-block; padding: 15px 45px; border: 1px solid #d4af37; color: #d4af37; text-decoration: none; font-size: 1.2rem; letter-spacing: 3px; margin-top: 20px; background: rgba(0,0,0,0.4); font-weight: bold; }
 
@@ -58,6 +58,27 @@
         }
         canvas { width: 100%; display: block; cursor: pointer; }
         
+        /* BUFFERING ILLUSION OVERLAY */
+        #buffer-overlay {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); 
+            backdrop-filter: blur(2px);
+            display: none; 
+            align-items: center; justify-content: center;
+            z-index: 100;
+        }
+        .spinner {
+            width: 50px; height: 50px;
+            border: 3px solid rgba(212, 175, 55, 0.2);
+            border-radius: 50%;
+            border-top-color: #d4af37;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* UI OVERLAY */
         .ui-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; transition: opacity 0.5s; opacity: 1; }
         .ui-hidden { opacity: 0; }
         #playBtn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.7); border: 1px solid #fff; color: white; width: 65px; height: 65px; border-radius: 50%; font-size: 24px; cursor: pointer; pointer-events: auto; z-index: 20; }
@@ -91,6 +112,9 @@
         </div>
         <div class="video-container">
             <canvas id="magicCanvas" width="1280" height="720"></canvas>
+            
+            <div id="buffer-overlay"><div class="spinner"></div></div>
+
             <div class="ui-overlay" id="uiOverlay">
                 <button id="playBtn" onclick="togglePlay(event)">&#9654;</button>
                 <input type="range" id="progress-bar" min="0" max="100" value="0">
@@ -116,12 +140,13 @@
         const canvas = document.getElementById('magicCanvas');
         const ctx = canvas.getContext('2d');
         const progressBar = document.getElementById('progress-bar');
+        const bufferOverlay = document.getElementById('buffer-overlay');
+        
         const videoMap = {
             'video1': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769255934/lv_0_20260124172742_nqtx0o.mp4',
             'video2': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769255963/lv_0_20260124172757_wdysqo.mp4'
         };
 
-        // DOUBLE BUFFERING SYSTEM
         let playerA = document.createElement('video');
         let playerB = document.createElement('video');
         [playerA, playerB].forEach(v => {
@@ -131,24 +156,29 @@
         let activePlayer = playerA;
         let hiddenPlayer = playerB;
         let currentID = 'video1';
+        let lastSentTime = 0;
+        let isLocked = false;
+
+        const EXPIRE_AFTER = 5 * 60 * 1000; // 5 minutes
+        const STOP_VIDEO_AT = 10; // Freeze point
 
         activePlayer.src = videoMap[currentID];
 
-        // FIXED PROGRESS BAR DRAGGING
+        db.ref('lastSentTime').on('value', snap => { lastSentTime = snap.val() || 0; });
+
         progressBar.addEventListener('input', function() {
-            const seekTime = (progressBar.value / 100) * activePlayer.duration;
-            activePlayer.currentTime = seekTime;
-            hiddenPlayer.currentTime = seekTime;
+            if(isLocked) return;
+            activePlayer.currentTime = (progressBar.value / 100) * activePlayer.duration;
         });
 
         db.ref('currentVideo').on('value', (snapshot) => {
             const val = snapshot.val() || 'video1';
-            document.getElementById('footerText').innerText = "♤rainsonofficial.com";
-            
             if (val !== currentID) {
+                isLocked = false;
+                bufferOverlay.style.display = 'none';
+                
                 const syncTime = activePlayer.currentTime;
                 const isPlaying = !activePlayer.paused;
-                
                 currentID = val;
                 hiddenPlayer.src = videoMap[val];
                 hiddenPlayer.load();
@@ -174,6 +204,7 @@
 
         function togglePlay(e) { 
             e.stopPropagation(); 
+            if (isLocked) return;
             if (activePlayer.paused) { 
                 activePlayer.play(); 
                 document.getElementById('playBtn').innerHTML = "||"; 
@@ -181,7 +212,6 @@
             } else { 
                 activePlayer.pause(); 
                 document.getElementById('playBtn').innerHTML = "&#9654;"; 
-                uiOverlay.classList.remove('ui-hidden');
             } 
         }
         
@@ -192,13 +222,20 @@
             if (!activePlayer.paused) { hideTimeout = setTimeout(() => { uiOverlay.classList.add('ui-hidden'); }, 2000); }
         }
 
-        canvas.addEventListener('touchstart', (e) => { 
-            e.preventDefault(); 
-            showUI(); 
-        });
+        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); showUI(); });
 
         function render() {
             ctx.drawImage(activePlayer, 0, 0, canvas.width, canvas.height);
+
+            const timeSinceInput = Date.now() - lastSentTime;
+            if (timeSinceInput > EXPIRE_AFTER && activePlayer.currentTime >= STOP_VIDEO_AT) {
+                isLocked = true;
+                activePlayer.pause();
+                activePlayer.currentTime = STOP_VIDEO_AT;
+                bufferOverlay.style.display = 'flex';
+                document.getElementById('playBtn').innerHTML = "&#9654;";
+            }
+
             if (!activePlayer.paused && activePlayer.duration) { 
                 progressBar.value = (activePlayer.currentTime / activePlayer.duration) * 100; 
             }
@@ -208,3 +245,4 @@
     </script>
 </body>
 </html>
+
