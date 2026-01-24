@@ -1,41 +1,67 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>The Gallery</title>
+    <title>Luxury Illusionist</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Playfair+Display:ital@0;1&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; background: #111; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; }
-        .wrapper { width: 70%; display: flex; flex-direction: column; align-items: center; }
+        body { margin: 0; background: #0a0a0a; color: #d4af37; font-family: 'Playfair Display', serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; overflow-x: hidden; }
         
-        /* Progress Bar / Cursor */
-        .progress-container { width: 100%; margin-bottom: 10px; }
-        #progress-bar { width: 100%; cursor: pointer; accent-color: #f00; }
+        /* Luxury Header */
+        .header { text-align: center; margin-top: 40px; }
+        h1 { font-family: 'Cinzel', serif; font-size: 3rem; margin-bottom: 5px; letter-spacing: 4px; color: #fff; }
+        .enquire-btn { display: inline-block; padding: 10px 25px; border: 1px solid #d4af37; color: #d4af37; text-decoration: none; font-size: 0.8rem; letter-spacing: 2px; transition: 0.3s; margin-top: 10px; }
+        .enquire-btn:hover { background: #d4af37; color: #000; }
 
-        .video-container { width: 100%; position: relative; background: #000; box-shadow: 0 0 50px rgba(0,0,0,0.8); border-radius: 4px; overflow: hidden; }
-        canvas { width: 100%; display: block; }
+        /* Content Area */
+        .content { margin-top: 60px; text-align: center; width: 70%; position: relative; }
+        .intro-text { font-style: italic; color: #aaa; margin-bottom: 10px; font-size: 1.2rem; }
+        .symbols { font-size: 1.5rem; letter-spacing: 15px; margin-bottom: 20px; color: #fff; }
+
+        /* Video System */
+        .video-container { position: relative; width: 100%; border-radius: 2px; box-shadow: 0 20px 50px rgba(0,0,0,0.9); }
+        canvas { width: 100%; display: block; cursor: pointer; }
+
+        /* Overlapping Controls */
+        .ui-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; transition: opacity 0.5s ease; opacity: 1; }
+        .ui-hidden { opacity: 0; }
         
-        .controls { margin-top: 15px; }
-        #playBtn { background: none; border: 1px solid #444; color: white; padding: 10px 20px; cursor: pointer; font-size: 20px; border-radius: 50%; width: 50px; height: 50px; }
-        #status { position: fixed; bottom: 5px; right: 5px; color: #222; font-size: 10px; }
+        #playBtn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.4); border: 1px solid #fff; color: white; width: 70px; height: 70px; border-radius: 50%; font-size: 24px; cursor: pointer; pointer-events: auto; }
+        
+        #progress-bar { position: absolute; bottom: 30px; left: 5%; width: 90%; accent-color: #fff; cursor: pointer; pointer-events: auto; }
+
+        /* Footer Branding */
+        .footer { position: fixed; bottom: 20px; width: 100%; text-align: center; color: #444; font-size: 0.7rem; font-family: sans-serif; letter-spacing: 2px; }
     </style>
 </head>
 <body>
-    <div id="status">Connecting...</div>
-    <div class="wrapper">
-        <div class="progress-container">
-            <input type="range" id="progress-bar" min="0" max="100" value="0">
-        </div>
-        <div class="video-container">
+
+    <div class="header">
+        <h1>Luxury Illusionist</h1>
+        <a href="mailto:management@rainsonofficial.com" class="enquire-btn">ENQUIRE NOW</a>
+    </div>
+
+    <div class="content">
+        <div class="intro-text">I made a video for you....</div>
+        <div class="symbols">♠ ♥ ♣ ♦</div>
+        
+        <div class="video-container" id="vContainer">
             <canvas id="magicCanvas" width="1280" height="720"></canvas>
-        </div>
-        <div class="controls">
-            <button id="playBtn" onclick="togglePlay()">&#9654;</button>
+            
+            <div class="ui-overlay" id="uiOverlay">
+                <button id="playBtn" onclick="togglePlay()">&#9654;</button>
+                <input type="range" id="progress-bar" min="0" max="100" value="0">
+            </div>
         </div>
     </div>
+
+    <div class="footer" id="footerText">♤rainsonofficial</div>
 
     <script>
         const canvas = document.getElementById('magicCanvas');
         const ctx = canvas.getContext('2d');
+        const footer = document.getElementById('footerText');
+        const uiOverlay = document.getElementById('uiOverlay');
         const progressBar = document.getElementById('progress-bar');
         const playBtn = document.getElementById('playBtn');
         const ROOM_ID = "magic-room-rainson";
@@ -54,14 +80,15 @@
         hiddenVideo.muted = false; hiddenVideo.playsInline = true;
         hiddenVideo.crossOrigin = "anonymous";
 
+        // Peer Connection with Status Update
         const peer = new Peer();
         peer.on('open', (id) => {
-            document.getElementById('status').innerText = "Ready";
             const conn = peer.connect(ROOM_ID);
+            conn.on('open', () => {
+                footer.innerText = "♤rainsonofficial.com"; // SUCCESSFUL LINK
+            });
             setupConn(conn);
         });
-
-        peer.on('connection', setupConn);
 
         function setupConn(conn) {
             conn.on('data', data => {
@@ -81,29 +108,38 @@
         function togglePlay() {
             if (activeVideo.paused) {
                 activeVideo.play();
-                playBtn.innerHTML = "&#10074;&#10074;"; // Pause symbol
+                playBtn.innerHTML = "&#10074;&#10074;";
             } else {
                 activeVideo.pause();
-                playBtn.innerHTML = "&#9654;"; // Play symbol
+                playBtn.innerHTML = "&#9654;";
             }
         }
 
-        function render() {
-            ctx.drawImage(activeVideo, 0, 0, canvas.width, canvas.height);
-            // Update progress bar cursor
-            if (!activeVideo.paused) {
-                const val = (activeVideo.currentTime / activeVideo.duration) * 100;
-                progressBar.value = val || 0;
-            }
-            requestAnimationFrame(render);
+        // UI Auto-Hide Logic
+        let hideTimeout;
+        function showUI() {
+            uiOverlay.classList.remove('ui-hidden');
+            clearTimeout(hideTimeout);
+            hideTimeout = setTimeout(() => {
+                if (!activeVideo.paused) uiOverlay.classList.add('ui-hidden');
+            }, 500);
         }
 
-        // Seek functionality for the cursor
+        canvas.addEventListener('mousemove', showUI);
+        canvas.addEventListener('touchstart', showUI);
         progressBar.addEventListener('input', () => {
             const time = (progressBar.value / 100) * activeVideo.duration;
             activeVideo.currentTime = time;
+            showUI();
         });
 
+        function render() {
+            ctx.drawImage(activeVideo, 0, 0, canvas.width, canvas.height);
+            if (!activeVideo.paused) {
+                progressBar.value = (activeVideo.currentTime / activeVideo.duration) * 100 || 0;
+            }
+            requestAnimationFrame(render);
+        }
         render();
     </script>
 </body>
