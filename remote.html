@@ -83,12 +83,10 @@
         let swipePath = [];
         let holdTimer;
 
-        // NEW: PERSISTENT CLOUD FETCH
-        // This runs once on load AND every time the DB changes
+        // Fetch last value on load & keep it updated
         db.ref('currentVideo').on('value', (snapshot) => {
             const cloudVal = snapshot.val();
             if (cloudVal) {
-                // Strip "video" prefix to get just the number (e.g., "video12" -> "12")
                 lastSentValue = cloudVal.replace("video", "");
             } else {
                 lastSentValue = "_";
@@ -116,8 +114,6 @@
         function updateDisplays() {
             document.getElementById('btn-display').innerText = currentInput || "_";
             document.getElementById('peek-current').innerText = currentInput || "_";
-            
-            // These now reflect the 'lastSentValue' synced from the cloud
             document.getElementById('top-right-display').innerText = lastSentValue;
             document.getElementById('peek-last').innerText = lastSentValue;
         }
@@ -132,13 +128,17 @@
         function sendData() {
             if (currentInput === "") return;
             
-            // Push to cloud
+            // 1. SEND TO CLOUD
             db.ref('currentVideo').set("video" + currentInput);
             db.ref('lastSentTime').set(Date.now());
             
+            // 2. WIPE CURRENT INPUT IMMEDIATELY
+            currentInput = ""; 
+            swipePath = [];
+            
+            // 3. REFRESH VISUALS
             vibrate(400);
-            currentInput = ""; // Clear active input
-            // The display will auto-update via the .on('value') listener above
+            updateDisplays(); 
         }
 
         let startX, startY;
@@ -147,7 +147,7 @@
         gScreen.addEventListener('touchstart', e => {
             startX = e.touches[0].clientX;
             startY = e.touches[0].clientY;
-            holdTimer = setTimeout(sendData, 2000);
+            holdTimer = setTimeout(sendData, 2000); // Trigger send on 2s hold
         });
 
         gScreen.addEventListener('touchend', e => {
@@ -188,4 +188,3 @@
     </script>
 </body>
 </html>
-
