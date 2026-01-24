@@ -90,8 +90,8 @@
         #playBtn { 
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
             background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.5); 
-            color: white; width: 70px; height: 70px; border-radius: 50%; 
-            font-size: 24px; cursor: pointer; pointer-events: auto; 
+            color: white; width: 120px; height: 120px; border-radius: 50%; 
+            font-size: 40px; cursor: pointer; pointer-events: auto; 
         }
         
         #progress-bar { position: absolute; bottom: 15px; left: 5%; width: 90%; accent-color: #ffffff; pointer-events: auto; }
@@ -128,7 +128,7 @@
         </div>
     </div>
 
-    <div class="footer" id="footerText">♤ rainsonofficial.com</div>
+    <div class="footer">♤ rainsonofficial.com</div>
 
     <script>
         const firebaseConfig = {
@@ -152,30 +152,39 @@
         let vB = document.getElementById('playerB');
         let active = vA;
         let hidden = vB;
-        let currentID = 'video1';
+        let currentID = null; 
         let lastSentTime = 0;
         let isLocked = false;
+        let hideTimeout;
 
-        const EXPIRE_AFTER = 15 * 60 * 1000; // 15 MINUTES
+        const EXPIRE_AFTER = 15 * 60 * 1000;
 
-        vA.src = videoMap['video1'];
-
-        // Listener for Remote commands
+        // 1. LISTEN FOR TIME
         db.ref('lastSentTime').on('value', snap => { 
             lastSentTime = snap.val() || 0;
-            // UNLOCK the system if a new command was sent recently
             if (Date.now() - lastSentTime < EXPIRE_AFTER) {
                 isLocked = false;
                 setBuffering(false);
             }
         });
 
+        // 2. LISTEN FOR CURRENT VIDEO (Loads immediately on startup)
         db.ref('currentVideo').on('value', (snapshot) => {
             const val = snapshot.val() || 'video1';
-            if (val !== currentID) {
+            
+            // If this is the FIRST load, just set the source
+            if (currentID === null) {
                 currentID = val;
+                active.src = videoMap[val];
+                active.load();
+                return;
+            }
+
+            // If it's a SWAP while page is already open
+            if (val !== currentID) {
                 const syncTime = active.currentTime;
                 const isPlaying = !active.paused;
+                currentID = val;
 
                 hidden.src = videoMap[val];
                 hidden.currentTime = syncTime;
@@ -201,7 +210,7 @@
                 ui.classList.add('ui-hidden');
             } else {
                 overlay.style.display = 'none';
-                ui.classList.remove('ui-hidden');
+                if(active.paused) ui.classList.remove('ui-hidden');
             }
         }
 
@@ -215,45 +224,60 @@
         }
 
         function togglePlay() {
-            // Check if 15 minutes have passed since the LAST command
             if (Date.now() - lastSentTime > EXPIRE_AFTER) {
                 isLocked = true;
-                setBuffering(true); // Locks them into infinite buffering
+                setBuffering(true);
                 return;
             }
 
             if (active.paused) {
                 active.play();
                 document.getElementById('playBtn').innerHTML = "||";
-                hideUIAuto();
+                handleUIFade();
             } else {
                 active.pause();
                 document.getElementById('playBtn').innerHTML = "&#9654;";
+                showUI();
             }
         }
 
-        function hideUIAuto() {
-            setTimeout(() => {
-                if (!active.paused && !isLocked) document.getElementById('uiOverlay').classList.add('ui-hidden');
-            }, 2000);
+        function showUI() {
+            const ui = document.getElementById('uiOverlay');
+            const cont = document.getElementById('v-cont');
+            ui.classList.remove('ui-hidden');
+            cont.style.cursor = 'default';
+            clearTimeout(hideTimeout);
         }
 
-        // Keep progress bar moving
+        function handleUIFade() {
+            showUI();
+            hideTimeout = setTimeout(() => {
+                if (!active.paused && !isLocked) {
+                    document.getElementById('uiOverlay').classList.add('ui-hidden');
+                    document.getElementById('v-cont').style.cursor = 'none';
+                }
+            }, 1000); // 1 SECOND FADE
+        }
+
+        document.getElementById('v-cont').onclick = () => {
+            if (isLocked) return;
+            if (document.getElementById('uiOverlay').classList.contains('ui-hidden')) {
+                handleUIFade();
+            } else {
+                togglePlay();
+            }
+        };
+
         setInterval(() => {
             if (!active.paused && active.duration) {
                 document.getElementById('progress-bar').value = (active.currentTime / active.duration) * 100;
             }
         }, 100);
 
-        document.getElementById('v-cont').onclick = () => {
-            if (isLocked) return;
-            document.getElementById('uiOverlay').classList.remove('ui-hidden');
-            hideUIAuto();
-        };
-
         document.getElementById('progress-bar').oninput = (e) => {
             if (isLocked) return;
             active.currentTime = (e.target.value / 100) * active.duration;
+            showUI();
         };
     </script>
 </body>
