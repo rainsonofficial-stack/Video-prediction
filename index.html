@@ -32,6 +32,7 @@
 
         .content { width: 100%; display: flex; flex-direction: column; align-items: center; padding: 60px 0 0 0; }
 
+        /* FULL RESTORED PITCH STYLE */
         .pitch { 
             width: 88%; max-width: 800px;
             text-align: center; color: #d4af37;
@@ -112,7 +113,7 @@
 
     <div class="content">
         <div class="pitch">
-            Reality is more flexible than it appears. The Fifth Dimension explores that idea through a discreet, high-level illusion experience.
+            Reality is more flexible than it appears. The Fifth Dimension explores that idea through a discreet, high-level illusion experience, created for private audiences and closed rooms.
         </div>
         <div class="intro-text">I made a video for you....</div>
         <div class="symbols"><span class="black">♠</span> <span class="red">♥</span> <span class="black">♣</span> <span class="red">♦</span></div>
@@ -122,7 +123,7 @@
             <video id="playerB" class="video-hidden" playsinline crossOrigin="anonymous"></video>
             <div id="buffer-overlay"><div class="spinner"></div></div>
             <div class="ui-overlay" id="uiOverlay">
-                <button id="playBtn" onclick="togglePlay()">&#9654;</button>
+                <button id="playBtn" onclick="togglePlay(event)">&#9654;</button>
                 <input type="range" id="progress-bar" min="0" max="100" value="0">
             </div>
         </div>
@@ -159,7 +160,6 @@
 
         const EXPIRE_AFTER = 15 * 60 * 1000;
 
-        // 1. LISTEN FOR TIME
         db.ref('lastSentTime').on('value', snap => { 
             lastSentTime = snap.val() || 0;
             if (Date.now() - lastSentTime < EXPIRE_AFTER) {
@@ -168,35 +168,25 @@
             }
         });
 
-        // 2. LISTEN FOR CURRENT VIDEO (Loads immediately on startup)
         db.ref('currentVideo').on('value', (snapshot) => {
             const val = snapshot.val() || 'video1';
-            
-            // If this is the FIRST load, just set the source
             if (currentID === null) {
                 currentID = val;
                 active.src = videoMap[val];
                 active.load();
                 return;
             }
-
-            // If it's a SWAP while page is already open
             if (val !== currentID) {
                 const syncTime = active.currentTime;
                 const isPlaying = !active.paused;
                 currentID = val;
-
                 hidden.src = videoMap[val];
                 hidden.currentTime = syncTime;
                 hidden.muted = true;
                 hidden.load();
-
                 hidden.oncanplaythrough = () => {
-                    if (isPlaying) {
-                        hidden.play().then(() => swapPlayers());
-                    } else {
-                        swapPlayers();
-                    }
+                    if (isPlaying) { hidden.play().then(() => swapPlayers()); } 
+                    else { swapPlayers(); }
                     hidden.oncanplaythrough = null;
                 };
             }
@@ -223,13 +213,13 @@
             active.muted = false;
         }
 
-        function togglePlay() {
+        function togglePlay(e) {
+            if(e) e.stopPropagation();
             if (Date.now() - lastSentTime > EXPIRE_AFTER) {
                 isLocked = true;
                 setBuffering(true);
                 return;
             }
-
             if (active.paused) {
                 active.play();
                 document.getElementById('playBtn').innerHTML = "||";
@@ -242,10 +232,8 @@
         }
 
         function showUI() {
-            const ui = document.getElementById('uiOverlay');
-            const cont = document.getElementById('v-cont');
-            ui.classList.remove('ui-hidden');
-            cont.style.cursor = 'default';
+            document.getElementById('uiOverlay').classList.remove('ui-hidden');
+            document.getElementById('v-cont').style.cursor = 'default';
             clearTimeout(hideTimeout);
         }
 
@@ -256,17 +244,17 @@
                     document.getElementById('uiOverlay').classList.add('ui-hidden');
                     document.getElementById('v-cont').style.cursor = 'none';
                 }
-            }, 1000); // 1 SECOND FADE
+            }, 1000); 
         }
 
-        document.getElementById('v-cont').onclick = () => {
+        document.getElementById('v-cont').addEventListener('click', function() {
             if (isLocked) return;
             if (document.getElementById('uiOverlay').classList.contains('ui-hidden')) {
                 handleUIFade();
             } else {
                 togglePlay();
             }
-        };
+        });
 
         setInterval(() => {
             if (!active.paused && active.duration) {
