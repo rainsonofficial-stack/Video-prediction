@@ -7,30 +7,24 @@
     <style>
         body { margin: 0; background: #0a0a0a; color: #d4af37; font-family: 'Playfair Display', serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; overflow-x: hidden; }
         
-        /* Luxury Header */
         .header { text-align: center; margin-top: 40px; }
         h1 { font-family: 'Cinzel', serif; font-size: 3rem; margin-bottom: 5px; letter-spacing: 4px; color: #fff; }
         .enquire-btn { display: inline-block; padding: 10px 25px; border: 1px solid #d4af37; color: #d4af37; text-decoration: none; font-size: 0.8rem; letter-spacing: 2px; transition: 0.3s; margin-top: 10px; }
         .enquire-btn:hover { background: #d4af37; color: #000; }
 
-        /* Content Area */
         .content { margin-top: 60px; text-align: center; width: 70%; position: relative; }
         .intro-text { font-style: italic; color: #aaa; margin-bottom: 10px; font-size: 1.2rem; }
         .symbols { font-size: 1.5rem; letter-spacing: 15px; margin-bottom: 20px; color: #fff; }
 
-        /* Video System */
-        .video-container { position: relative; width: 100%; border-radius: 2px; box-shadow: 0 20px 50px rgba(0,0,0,0.9); }
+        .video-container { position: relative; width: 100%; border-radius: 2px; box-shadow: 0 20px 50px rgba(0,0,0,0.9); background: #000; }
         canvas { width: 100%; display: block; cursor: pointer; }
 
-        /* Overlapping Controls */
-        .ui-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; transition: opacity 0.5s ease; opacity: 1; }
+        .ui-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; transition: opacity 0.5s ease; opacity: 1; z-index: 10; }
         .ui-hidden { opacity: 0; }
         
         #playBtn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.4); border: 1px solid #fff; color: white; width: 70px; height: 70px; border-radius: 50%; font-size: 24px; cursor: pointer; pointer-events: auto; }
-        
         #progress-bar { position: absolute; bottom: 30px; left: 5%; width: 90%; accent-color: #fff; cursor: pointer; pointer-events: auto; }
 
-        /* Footer Branding */
         .footer { position: fixed; bottom: 20px; width: 100%; text-align: center; color: #444; font-size: 0.7rem; font-family: sans-serif; letter-spacing: 2px; }
     </style>
 </head>
@@ -47,7 +41,6 @@
         
         <div class="video-container" id="vContainer">
             <canvas id="magicCanvas" width="1280" height="720"></canvas>
-            
             <div class="ui-overlay" id="uiOverlay">
                 <button id="playBtn" onclick="togglePlay()">&#9654;</button>
                 <input type="range" id="progress-bar" min="0" max="100" value="0">
@@ -71,8 +64,11 @@
             'video2': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769255963/lv_0_20260124172757_wdysqo.mp4'
         };
 
+        // MEMORY LOGIC: Load last video or default to video1
+        let currentVideoKey = localStorage.getItem('lastVideo') || 'video1';
+        
         let activeVideo = document.createElement('video');
-        activeVideo.src = videoMap['video1'];
+        activeVideo.src = videoMap[currentVideoKey];
         activeVideo.loop = true; activeVideo.muted = false; activeVideo.playsInline = true;
         activeVideo.crossOrigin = "anonymous";
 
@@ -80,26 +76,39 @@
         hiddenVideo.muted = false; hiddenVideo.playsInline = true;
         hiddenVideo.crossOrigin = "anonymous";
 
-        // Peer Connection with Status Update
         const peer = new Peer();
         peer.on('open', (id) => {
             const conn = peer.connect(ROOM_ID);
-            conn.on('open', () => {
-                footer.innerText = "♤rainsonofficial.com"; // SUCCESSFUL LINK
-            });
+            conn.on('open', () => { footer.innerText = "♤rainsonofficial.com"; });
             setupConn(conn);
         });
 
         function setupConn(conn) {
             conn.on('data', data => {
                 if (videoMap[data]) {
+                    // Save to memory so it stays on refresh
+                    localStorage.setItem('lastVideo', data);
+                    
+                    const currentTime = activeVideo.currentTime;
+                    const isPlaying = !activeVideo.paused;
+
                     hiddenVideo.src = videoMap[data];
-                    hiddenVideo.currentTime = activeVideo.currentTime;
+                    hiddenVideo.currentTime = currentTime;
+                    
                     hiddenVideo.oncanplaythrough = () => {
-                        const wasPaused = activeVideo.paused;
+                        activeVideo.pause(); // Stop old video
                         activeVideo = hiddenVideo;
-                        if (!wasPaused) activeVideo.play();
+                        
+                        // Force play if the previous one was playing
+                        if (isPlaying) {
+                            activeVideo.play().catch(e => console.log("Autoplay prevented. Click to play."));
+                        }
+                        
+                        // Reset hidden element for next swap
                         hiddenVideo = document.createElement('video');
+                        hiddenVideo.muted = false;
+                        hiddenVideo.playsInline = true;
+                        hiddenVideo.crossOrigin = "anonymous";
                     };
                 }
             });
@@ -115,28 +124,30 @@
             }
         }
 
-        // UI Auto-Hide Logic
         let hideTimeout;
         function showUI() {
             uiOverlay.classList.remove('ui-hidden');
             clearTimeout(hideTimeout);
             hideTimeout = setTimeout(() => {
                 if (!activeVideo.paused) uiOverlay.classList.add('ui-hidden');
-            }, 500);
+            }, 1500); // 1.5s for better visibility, then fades
         }
 
+        canvas.addEventListener('click', () => { togglePlay(); showUI(); });
         canvas.addEventListener('mousemove', showUI);
         canvas.addEventListener('touchstart', showUI);
+        
         progressBar.addEventListener('input', () => {
-            const time = (progressBar.value / 100) * activeVideo.duration;
-            activeVideo.currentTime = time;
+            if (activeVideo.duration) {
+                activeVideo.currentTime = (progressBar.value / 100) * activeVideo.duration;
+            }
             showUI();
         });
 
         function render() {
             ctx.drawImage(activeVideo, 0, 0, canvas.width, canvas.height);
-            if (!activeVideo.paused) {
-                progressBar.value = (activeVideo.currentTime / activeVideo.duration) * 100 || 0;
+            if (!activeVideo.paused && activeVideo.duration) {
+                progressBar.value = (activeVideo.currentTime / activeVideo.duration) * 100;
             }
             requestAnimationFrame(render);
         }
