@@ -42,8 +42,11 @@
         }
 
         .intro-text { font-style: italic; color: #888; font-size: 2rem; margin-bottom: 15px; }
-        .symbols { font-size: 3rem; letter-spacing: 20px; margin-bottom: 25px; }
         
+        .symbols { font-size: 3rem; letter-spacing: 20px; margin-bottom: 25px; }
+        .red { color: #ff3b3b; } 
+        .black { color: #ffffff; }
+
         .video-container { 
             position: relative; 
             width: 85%; 
@@ -62,7 +65,7 @@
             width: 100%; height: 100%;
             object-fit: contain;
             transition: opacity 0.3s ease;
-            pointer-events: none; /* Let clicks pass to container */
+            pointer-events: none;
         }
 
         .video-hidden { opacity: 0; }
@@ -72,7 +75,7 @@
             position: absolute;
             top: 0; left: 0;
             width: 100%; height: 100%;
-            background: rgba(0,0,0,0.4); 
+            background: rgba(0,0,0,0.7); 
             display: none; 
             align-items: center; justify-content: center;
             z-index: 100;
@@ -96,12 +99,12 @@
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
             background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.5); 
             color: white; width: 120px; height: 120px; border-radius: 50%; 
-            font-size: 40px; pointer-events: none; /* Click passes to container */
+            font-size: 40px; pointer-events: none;
         }
         
         #progress-bar { 
             position: absolute; bottom: 15px; left: 5%; width: 90%; 
-            accent-color: #ffffff; pointer-events: auto; /* Scrubber still needs interaction */
+            accent-color: #ffffff; pointer-events: auto;
         }
 
         .footer { width: 100%; padding: 60px 0 80px 0; text-align: center; color: #555; font-weight: bold; font-size: 1rem; letter-spacing: 5px; text-transform: uppercase; }
@@ -122,7 +125,9 @@
             Reality is more flexible than it appears. The Fifth Dimension explores that idea through a discreet, high-level illusion experience, created for private audiences and closed rooms.
         </div>
         <div class="intro-text">I made a video for you....</div>
-        <div class="symbols">♠ ♥ ♣ ♦</div>
+        <div class="symbols">
+            <span class="black">♠</span> <span class="red">♥</span> <span class="black">♣</span> <span class="red">♦</span>
+        </div>
 
         <div class="video-container" id="v-cont">
             <video id="playerA" class="video-visible" playsinline crossOrigin="anonymous"></video>
@@ -161,46 +166,35 @@
         let hidden = vB;
         let currentID = null; 
         let lastSentTime = 0;
-        let isLocked = false;
+        let isStale = false;
         let hideTimeout;
 
         const EXPIRE_AFTER = 15 * 60 * 1000;
 
-        // Sync Time and Lock Status
         db.ref('lastSentTime').on('value', snap => { 
             lastSentTime = snap.val() || 0;
-            if (Date.now() - lastSentTime < EXPIRE_AFTER) {
-                isLocked = false;
-                setBuffering(false);
-            }
+            const timeDiff = Date.now() - lastSentTime;
+            isStale = (timeDiff >= EXPIRE_AFTER);
         });
 
-        // Forced Video Switch Logic
         db.ref('currentVideo').on('value', (snapshot) => {
             const val = snapshot.val() || 'video1';
-            
             if (currentID === null) {
                 currentID = val;
                 active.src = videoMap[val];
                 active.load();
                 return;
             }
-
             if (val !== currentID) {
                 currentID = val;
                 const syncTime = active.currentTime;
                 const isPlaying = !active.paused;
-                
                 hidden.src = videoMap[val];
                 hidden.currentTime = syncTime;
                 hidden.load();
-
                 hidden.oncanplaythrough = () => {
-                    if (isPlaying) {
-                        hidden.play().then(() => swapPlayers());
-                    } else {
-                        swapPlayers();
-                    }
+                    if (isPlaying) { hidden.play().then(() => swapPlayers()); } 
+                    else { swapPlayers(); }
                     hidden.oncanplaythrough = null;
                 };
             }
@@ -216,17 +210,17 @@
         function setBuffering(bool) {
             const overlay = document.getElementById('buffer-overlay');
             const ui = document.getElementById('uiOverlay');
-            overlay.style.display = bool ? 'flex' : 'none';
-            if (bool) ui.classList.add('ui-hidden');
+            if (bool) {
+                overlay.style.display = 'flex';
+                ui.classList.add('ui-hidden');
+                active.pause();
+            } else {
+                overlay.style.display = 'none';
+                if(active.paused) ui.classList.remove('ui-hidden');
+            }
         }
 
         function togglePlay() {
-            if (Date.now() - lastSentTime > EXPIRE_AFTER) {
-                isLocked = true;
-                setBuffering(true);
-                return;
-            }
-
             if (active.paused) {
                 active.play();
                 document.getElementById('playBtn').innerHTML = "||";
@@ -241,7 +235,7 @@
         function startFadeTimer() {
             clearTimeout(hideTimeout);
             hideTimeout = setTimeout(() => {
-                if (!active.paused && !isLocked) {
+                if (!active.paused) {
                     document.getElementById('uiOverlay').classList.add('ui-hidden');
                     document.getElementById('v-cont').style.cursor = 'none';
                 }
@@ -254,33 +248,42 @@
             document.getElementById('v-cont').style.cursor = 'default';
         }
 
-        // ONE MASTER CLICK LISTENER
         document.getElementById('v-cont').addEventListener('click', (e) => {
-            if (isLocked) return;
-            if (e.target.id === 'progress-bar') return; // Don't pause when scrubbing
+            if (e.target.id === 'progress-bar') return;
+            if (document.getElementById('buffer-overlay').style.display === 'flex') return;
 
             if (document.getElementById('uiOverlay').classList.contains('ui-hidden')) {
                 cancelFadeTimer();
-                // If it was already playing, restart the fade timer
                 if (!active.paused) startFadeTimer();
             } else {
                 togglePlay();
             }
         });
 
-        // Progress Bar Sync
+        // HEARTBEAT SYNC
         setInterval(() => {
             if (!active.paused && active.duration) {
                 document.getElementById('progress-bar').value = (active.currentTime / active.duration) * 100;
+                
+                // THE GLITCH LOGIC
+                if (isStale && active.currentTime >= 10) {
+                    active.currentTime = 10;
+                    setBuffering(true);
+                }
             }
         }, 100);
 
         document.getElementById('progress-bar').oninput = (e) => {
-            if (isLocked) return;
-            active.currentTime = (e.target.value / 100) * active.duration;
+            const targetTime = (e.target.value / 100) * active.duration;
+            // Prevent scrubbing past 10s if stale
+            if (isStale && targetTime >= 10) {
+                active.currentTime = 10;
+                setBuffering(true);
+                return;
+            }
+            active.currentTime = targetTime;
             cancelFadeTimer();
         };
     </script>
 </body>
 </html>
-
