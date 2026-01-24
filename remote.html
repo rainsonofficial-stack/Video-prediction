@@ -3,7 +3,8 @@
 <head>
     <title>Remote</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
     <style>
         body { margin: 0; background: #000; color: #444; font-family: sans-serif; touch-action: none; }
         .screen { display: none; height: 100vh; width: 100vw; flex-direction: column; align-items: center; justify-content: center; }
@@ -17,7 +18,6 @@
         
         .back-nav { position: absolute; top: 15px; left: 15px; padding: 10px; color: #888; border: 1px solid #333; border-radius: 5px; }
         
-        /* 1. Peek text reduced by 50% (from 2.5rem to 1.25rem) */
         #peek-display { position: absolute; bottom: 40px; left: 40px; color: rgba(120,120,120,0.3); font-size: 1.25rem; display: none; pointer-events: none; }
         
         .corner { position: absolute; width: 30%; height: 25%; z-index: 100; background: transparent; }
@@ -50,18 +50,33 @@
     </div>
 
     <script>
-        const ROOM_ID = "magic-room-rainson";
-        let peer = new Peer(ROOM_ID); 
-        let connections = [];
+        // --- YOUR UPDATED FIREBASE CONFIG ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDxPQYrMlOslsqJeHnfj2MSpROZfaAwVH0",
+            authDomain: "rainson-magic.firebaseapp.com",
+            projectId: "rainson-magic",
+            databaseURL: "https://rainson-magic-default-rtdb.firebaseio.com",
+            storageBucket: "rainson-magic.firebasestorage.app",
+            messagingSenderId: "290150598500",
+            appId: "1:290150598500:web:4fbe7642b2baf839609c71"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // Check connection
+        db.ref('.info/connected').on('value', (snap) => {
+            if (snap.val() === true) {
+                document.getElementById('status').innerText = "System Live (Cloud)";
+            } else {
+                document.getElementById('status').innerText = "Connecting...";
+            }
+        });
+
         let currentInput = "";
         let swipePath = [];
-        let holdTimer; // Timer for the 2-second hold
-
-        peer.on('open', () => document.getElementById('status').innerText = "System Live");
-        peer.on('connection', conn => {
-            connections.push(conn);
-            vibrate(150);
-        });
+        let holdTimer;
 
         function showScreen(id) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -88,11 +103,19 @@
         function sendData() {
             if (currentInput === "") return;
             const msg = "video" + currentInput;
-            connections.forEach(c => { if(c.open) c.send(msg); });
-            vibrate(500); // Long vibration confirms send
-            currentInput = "";
-            document.getElementById('btn-display').innerText = "_";
-            document.getElementById('peek-display').innerText = "_";
+            
+            // SEND TO CLOUD
+            db.ref('currentVideo').set(msg)
+                .then(() => {
+                    vibrate(500); // Confirmation vibration
+                    currentInput = "";
+                    document.getElementById('btn-display').innerText = "_";
+                    document.getElementById('peek-display').innerText = "_";
+                })
+                .catch((error) => {
+                    console.error("Cloud Error: ", error);
+                    alert("Sync Error. Check your Rules.");
+                });
         }
 
         let startX, startY;
@@ -102,14 +125,13 @@
             startX = e.touches[0].clientX;
             startY = e.touches[0].clientY;
             
-            // 2. Start timer: Send once hold reaches 2000ms (before let go)
+            // Hold for 2 seconds to send
             holdTimer = setTimeout(() => {
                 sendData();
             }, 2000);
         });
 
         gScreen.addEventListener('touchend', e => {
-            // Cancel the hold-to-send timer if the user lets go early
             clearTimeout(holdTimer);
 
             const dx = e.changedTouches[0].clientX - startX;
@@ -151,4 +173,3 @@
     </script>
 </body>
 </html>
-
