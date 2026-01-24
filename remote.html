@@ -9,39 +9,47 @@
         .screen { display: none; height: 100vh; width: 100vw; flex-direction: column; align-items: center; justify-content: center; }
         .active { display: flex; }
         .mode-btn { padding: 25px; width: 80%; margin: 10px; background: #111; color: #666; border: 1px solid #333; border-radius: 10px; font-size: 1.2rem; }
+        
         .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; width: 90%; }
         .num-btn { padding: 30px; background: #0a0a0a; border: 1px solid #222; color: #fff; font-size: 1.5rem; border-radius: 10px; }
-        #peek-display { position: absolute; bottom: 40px; left: 40px; color: #222; font-size: 2rem; display: none; }
-        .corner { position: absolute; width: 25%; height: 20%; z-index: 100; }
+        
+        /* White Send Button */
+        .send-btn { background: #fff !important; color: #000 !important; font-weight: bold; }
+        
+        .back-nav { position: absolute; top: 15px; left: 15px; padding: 10px; color: #888; border: 1px solid #333; border-radius: 5px; }
+        #peek-display { position: absolute; bottom: 40px; left: 40px; color: #222; font-size: 2.5rem; display: none; }
+        .corner { position: absolute; width: 30%; height: 25%; z-index: 100; background: transparent; }
     </style>
 </head>
 <body>
 
     <div id="setup-screen" class="screen active">
-        <h2 id="status">Initializing...</h2>
+        <h2 id="status">System Initializing...</h2>
         <button class="mode-btn" onclick="showScreen('button-screen')">Button Mode</button>
         <button class="mode-btn" onclick="showScreen('gesture-screen')">Swipe Mode</button>
     </div>
 
     <div id="button-screen" class="screen">
-        <div style="color:#222; font-size: 2rem; margin-bottom: 20px;" id="btn-display">_</div>
+        <div class="back-nav" onclick="showScreen('setup-screen')">Back</div>
+        <div style="color:#333; font-size: 2rem; margin-bottom: 20px;" id="btn-display">_</div>
         <div class="grid">
             <button class="num-btn" onclick="addDigit(7)">7</button><button class="num-btn" onclick="addDigit(8)">8</button><button class="num-btn" onclick="addDigit(9)">9</button>
             <button class="num-btn" onclick="addDigit(4)">4</button><button class="num-btn" onclick="addDigit(5)">5</button><button class="num-btn" onclick="addDigit(6)">6</button>
             <button class="num-btn" onclick="addDigit(1)">1</button><button class="num-btn" onclick="addDigit(2)">2</button><button class="num-btn" onclick="addDigit(3)">3</button>
-            <button class="num-btn" onclick="clearInput()">C</button><button class="num-btn" onclick="addDigit(0)">0</button><button class="num-btn" onclick="sendData()" style="color:#0f0">SEND</button>
+            <button class="num-btn" onclick="clearInput()">C</button><button class="num-btn" onclick="addDigit(0)">0</button>
+            <button class="num-btn send-btn" onclick="sendData()">SEND</button>
         </div>
     </div>
 
     <div id="gesture-screen" class="screen">
-        <div class="corner" style="top:0; left:0" id="back-zone"></div>
+        <div class="corner" style="bottom:0; left:0" id="back-zone"></div>
         <div class="corner" style="bottom:0; right:0" id="peek-zone"></div>
         <div id="peek-display">_</div>
     </div>
 
     <script>
         const ROOM_ID = "magic-room-rainson";
-        let peer = new Peer(ROOM_ID); // Fix the Remote ID
+        let peer = new Peer(ROOM_ID); 
         let connections = [];
         let currentInput = "";
         let swipePath = [];
@@ -49,7 +57,7 @@
         peer.on('open', () => document.getElementById('status').innerText = "System Live");
         peer.on('connection', conn => {
             connections.push(conn);
-            vibrate(100);
+            vibrate(150);
         });
 
         function showScreen(id) {
@@ -71,18 +79,17 @@
             swipePath = [];
             document.getElementById('btn-display').innerText = "_";
             document.getElementById('peek-display').innerText = "_";
-            vibrate([50, 50]);
+            vibrate([60, 40, 60]); 
         }
 
         function sendData() {
             const msg = "video" + currentInput;
             connections.forEach(c => { if(c.open) c.send(msg); });
-            vibrate(400);
+            vibrate(500);
             currentInput = "";
             document.getElementById('btn-display').innerText = "_";
         }
 
-        // --- FIXED GESTURE LOGIC ---
         let startX, startY, startTime;
         const gScreen = document.getElementById('gesture-screen');
 
@@ -98,9 +105,13 @@
             const duration = Date.now() - startTime;
             const dist = Math.sqrt(dx*dx + dy*dy);
 
+            // Send: Hold 2s
             if (dist < 10 && duration > 2000) { sendData(); return; }
 
-            if (dist > 20) { // Increased threshold slightly for stability
+            // Triple Tap Clear
+            // Logic handled via the multi-tap function below
+
+            if (dist > 15) {
                 let dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
                 swipePath.push(dir);
                 if (swipePath.length === 2) {
@@ -112,20 +123,26 @@
             }
         });
 
-        // Corner Taps
-        let backTaps = 0, peekTaps = 0;
-        document.getElementById('back-zone').onclick = () => {
-            backTaps++; setTimeout(() => { if(backTaps === 2) showScreen('setup-screen'); backTaps = 0; }, 300);
-        };
-        document.getElementById('peek-zone').onclick = () => {
-            peekTaps++; setTimeout(() => { 
-                if(peekTaps === 2) {
-                    const p = document.getElementById('peek-display');
-                    p.style.display = p.style.display === 'block' ? 'none' : 'block';
-                }
-                peekTaps = 0;
-            }, 300);
-        };
+        // Specialized Tap Handler
+        function handleMultiTap(element, targetCount, callback) {
+            let count = 0, timer;
+            element.addEventListener('click', () => {
+                count++;
+                clearTimeout(timer);
+                timer = setTimeout(() => {
+                    if (count === targetCount) callback();
+                    count = 0;
+                }, 350);
+            });
+        }
+
+        handleMultiTap(gScreen, 3, clearInput); // Triple Tap Screen -> Clear
+        handleMultiTap(document.getElementById('back-zone'), 2, () => showScreen('setup-screen')); // Double Tap Bottom Left -> Home
+        handleMultiTap(document.getElementById('peek-zone'), 2, () => { // Double Tap Bottom Right -> Peek
+            const p = document.getElementById('peek-display');
+            p.style.display = p.style.display === 'block' ? 'none' : 'block';
+        });
+
     </script>
 </body>
 </html>
