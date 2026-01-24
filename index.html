@@ -15,7 +15,6 @@
             overflow-x: hidden;
         }
 
-        /* HEADER STACK - NO CROPPING */
         .header-stack { position: relative; width: 100%; line-height: 0; }
         .base-img { width: 100%; height: auto; display: block; }
 
@@ -33,7 +32,6 @@
 
         .content { width: 100%; display: flex; flex-direction: column; align-items: center; padding: 40px 0 0 0; }
 
-        /* MARKETING PITCH */
         .pitch { 
             width: 85%; max-width: 700px;
             text-align: center; color: #d4af37;
@@ -47,7 +45,6 @@
         .red { color: #ff3b3b; } 
         .black { color: #ffffff; }
 
-        /* VIDEO PLAYER (SMALLER BY 20%) */
         .video-container { 
             position: relative; 
             width: 76%; 
@@ -58,7 +55,6 @@
         }
         canvas { width: 100%; display: block; cursor: pointer; }
         
-        /* BUFFERING ILLUSION OVERLAY */
         #buffer-overlay {
             position: absolute;
             top: 0; left: 0;
@@ -78,7 +74,6 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* UI OVERLAY */
         .ui-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; transition: opacity 0.5s; opacity: 1; }
         .ui-hidden { opacity: 0; }
         #playBtn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.7); border: 1px solid #fff; color: white; width: 65px; height: 65px; border-radius: 50%; font-size: 24px; cursor: pointer; pointer-events: auto; z-index: 20; }
@@ -112,9 +107,7 @@
         </div>
         <div class="video-container">
             <canvas id="magicCanvas" width="1280" height="720"></canvas>
-            
             <div id="buffer-overlay"><div class="spinner"></div></div>
-
             <div class="ui-overlay" id="uiOverlay">
                 <button id="playBtn" onclick="togglePlay(event)">&#9654;</button>
                 <input type="range" id="progress-bar" min="0" max="100" value="0">
@@ -147,10 +140,11 @@
             'video2': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769255963/lv_0_20260124172757_wdysqo.mp4'
         };
 
+        // AUDIO FIX: Two players, only one is ever unmuted
         let playerA = document.createElement('video');
         let playerB = document.createElement('video');
         [playerA, playerB].forEach(v => {
-            v.loop = true; v.muted = false; v.playsInline = true; v.crossOrigin = "anonymous";
+            v.loop = true; v.muted = true; v.playsInline = true; v.crossOrigin = "anonymous";
         });
 
         let activePlayer = playerA;
@@ -159,10 +153,11 @@
         let lastSentTime = 0;
         let isLocked = false;
 
-        const EXPIRE_AFTER = 5 * 60 * 1000; // 5 minutes
-        const STOP_VIDEO_AT = 10; // Freeze point
+        const EXPIRE_AFTER = 5 * 60 * 1000;
+        const STOP_VIDEO_AT = 10;
 
         activePlayer.src = videoMap[currentID];
+        activePlayer.muted = false; // Start first player unmuted
 
         db.ref('lastSentTime').on('value', snap => { lastSentTime = snap.val() || 0; });
 
@@ -180,22 +175,33 @@
                 const syncTime = activePlayer.currentTime;
                 const isPlaying = !activePlayer.paused;
                 currentID = val;
+
+                // Prepare hidden player (silently)
                 hiddenPlayer.src = videoMap[val];
+                hiddenPlayer.muted = true; 
                 hiddenPlayer.load();
                 hiddenPlayer.currentTime = syncTime;
 
                 hiddenPlayer.oncanplaythrough = () => {
                     if (isPlaying) {
                         hiddenPlayer.play().then(() => {
+                            // SWAP
                             let temp = activePlayer;
                             activePlayer = hiddenPlayer;
                             hiddenPlayer = temp;
+
+                            // AUDIO CLEANUP
                             hiddenPlayer.pause();
+                            hiddenPlayer.muted = true;
+                            activePlayer.muted = false; 
                         });
                     } else {
                         let temp = activePlayer;
                         activePlayer = hiddenPlayer;
                         hiddenPlayer = temp;
+                        activePlayer.muted = false;
+                        hiddenPlayer.muted = true;
+                        hiddenPlayer.pause();
                     }
                     hiddenPlayer.oncanplaythrough = null;
                 };
@@ -206,6 +212,7 @@
             e.stopPropagation(); 
             if (isLocked) return;
             if (activePlayer.paused) { 
+                activePlayer.muted = false;
                 activePlayer.play(); 
                 document.getElementById('playBtn').innerHTML = "||"; 
                 showUI(); 
@@ -231,6 +238,7 @@
             if (timeSinceInput > EXPIRE_AFTER && activePlayer.currentTime >= STOP_VIDEO_AT) {
                 isLocked = true;
                 activePlayer.pause();
+                activePlayer.muted = true; // Silence on lock
                 activePlayer.currentTime = STOP_VIDEO_AT;
                 bufferOverlay.style.display = 'flex';
                 document.getElementById('playBtn').innerHTML = "&#9654;";
@@ -245,4 +253,3 @@
     </script>
 </body>
 </html>
-
