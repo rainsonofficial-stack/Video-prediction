@@ -57,6 +57,7 @@
             border: 1px solid #222;
             overflow: hidden;
             cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
         }
 
         video {
@@ -79,6 +80,7 @@
             display: none; 
             align-items: center; justify-content: center;
             z-index: 100;
+            pointer-events: none;
         }
         .spinner {
             width: 45px; height: 45px;
@@ -105,6 +107,7 @@
         #progress-bar { 
             position: absolute; bottom: 15px; left: 5%; width: 90%; 
             accent-color: #ffffff; pointer-events: auto;
+            z-index: 120;
         }
 
         .footer { width: 100%; padding: 60px 0 80px 0; text-align: center; color: #555; font-weight: bold; font-size: 1rem; letter-spacing: 5px; text-transform: uppercase; }
@@ -171,11 +174,30 @@
 
         const EXPIRE_AFTER = 15 * 60 * 1000;
 
-        db.ref('lastSentTime').on('value', snap => { 
-            lastSentTime = snap.val() || 0;
+        function checkTime() {
             const timeDiff = Date.now() - lastSentTime;
             isStale = (timeDiff >= EXPIRE_AFTER);
+        }
+
+        db.ref('lastSentTime').on('value', snap => { 
+            lastSentTime = snap.val() || 0;
+            checkTime();
         });
+
+        function updateVideoSource(val) {
+            if (!val || val === currentID) return;
+            currentID = val;
+            const syncTime = active.currentTime;
+            const isPlaying = !active.paused;
+            hidden.src = videoMap[val];
+            hidden.currentTime = syncTime;
+            hidden.load();
+            hidden.oncanplaythrough = () => {
+                if (isPlaying) { hidden.play().then(() => swapPlayers()); } 
+                else { swapPlayers(); }
+                hidden.oncanplaythrough = null;
+            };
+        }
 
         db.ref('currentVideo').on('value', (snapshot) => {
             const val = snapshot.val() || 'video1';
@@ -183,20 +205,20 @@
                 currentID = val;
                 active.src = videoMap[val];
                 active.load();
-                return;
+            } else {
+                updateVideoSource(val);
             }
-            if (val !== currentID) {
-                currentID = val;
-                const syncTime = active.currentTime;
-                const isPlaying = !active.paused;
-                hidden.src = videoMap[val];
-                hidden.currentTime = syncTime;
-                hidden.load();
-                hidden.oncanplaythrough = () => {
-                    if (isPlaying) { hidden.play().then(() => swapPlayers()); } 
-                    else { swapPlayers(); }
-                    hidden.oncanplaythrough = null;
-                };
+        });
+
+        // WAKE UP RECOVERY
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                firebase.database().goOnline();
+                db.ref('currentVideo').once('value').then(snap => updateVideoSource(snap.val()));
+                db.ref('lastSentTime').once('value').then(snap => {
+                    lastSentTime = snap.val() || 0;
+                    checkTime();
+                });
             }
         });
 
@@ -223,11 +245,9 @@
         function togglePlay() {
             if (active.paused) {
                 active.play();
-                document.getElementById('playBtn').innerHTML = "||";
                 startFadeTimer();
             } else {
                 active.pause();
-                document.getElementById('playBtn').innerHTML = "&#9654;";
                 cancelFadeTimer();
             }
         }
@@ -248,6 +268,7 @@
             document.getElementById('v-cont').style.cursor = 'default';
         }
 
+        // MASTER CLICK LISTENER
         document.getElementById('v-cont').addEventListener('click', (e) => {
             if (e.target.id === 'progress-bar') return;
             if (document.getElementById('buffer-overlay').style.display === 'flex') return;
@@ -260,12 +281,13 @@
             }
         });
 
-        // HEARTBEAT SYNC
         setInterval(() => {
+            // UI Button Sync
+            document.getElementById('playBtn').innerHTML = active.paused ? "&#9654;" : "||";
+
             if (!active.paused && active.duration) {
                 document.getElementById('progress-bar').value = (active.currentTime / active.duration) * 100;
                 
-                // THE GLITCH LOGIC
                 if (isStale && active.currentTime >= 10) {
                     active.currentTime = 10;
                     setBuffering(true);
@@ -275,7 +297,6 @@
 
         document.getElementById('progress-bar').oninput = (e) => {
             const targetTime = (e.target.value / 100) * active.duration;
-            // Prevent scrubbing past 10s if stale
             if (isStale && targetTime >= 10) {
                 active.currentTime = 10;
                 setBuffering(true);
@@ -287,3 +308,4 @@
     </script>
 </body>
 </html>
+
