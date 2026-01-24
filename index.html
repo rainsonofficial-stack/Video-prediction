@@ -14,72 +14,44 @@
             align-items: center;
         }
 
-        /* --- STACKED HEADER (NO CROP) --- */
-        .header-stack {
-            position: relative;
-            width: 100%;
-            line-height: 0; /* Removes tiny gap under image */
-        }
-
-        .base-img {
-            width: 100%;
-            height: auto;
-            display: block; /* No cropping, starts at top */
-        }
+        .header-stack { position: relative; width: 100%; line-height: 0; }
+        .base-img { width: 100%; height: auto; display: block; }
 
         .header-overlay {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            /* Black tint over the image */
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.6); 
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            text-align: center;
-            line-height: normal; /* Resets text spacing */
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            text-align: center; line-height: normal;
         }
 
         h1 { font-family: 'Cinzel', serif; font-size: 2.2rem; margin: 0; letter-spacing: 4px; color: #fff; text-shadow: 0 2px 15px rgba(0,0,0,1); }
         .enquire-btn { display: inline-block; padding: 8px 25px; border: 1px solid #d4af37; color: #d4af37; text-decoration: none; font-size: 0.8rem; letter-spacing: 2px; margin-top: 15px; background: rgba(0,0,0,0.4); }
 
-        /* Content Spacing */
-        .content { 
-            width: 100%;
-            display: flex; flex-direction: column; align-items: center;
-            padding: 20px 0 0 0; 
-        }
-
+        .content { width: 100%; display: flex; flex-direction: column; align-items: center; padding: 20px 0 0 0; }
         .intro-text { font-style: italic; color: #888; font-size: 1.1rem; margin-bottom: 5px; }
-        
-        /* Card Symbol Colors */
         .symbols { font-size: 1.8rem; letter-spacing: 12px; margin-bottom: 10px; }
         .red { color: #ff3b3b; } 
         .black { color: #ffffff; }
 
-        /* Video Container (96% Wide) */
-        .video-container { 
-            position: relative; 
-            width: 96%; 
-            max-width: 850px; 
-            background: #000;
-            box-shadow: 0 10px 30px rgba(0,0,0,1);
-            border: 1px solid #1a1a1a;
-        }
+        .video-container { position: relative; width: 96%; max-width: 850px; background: #000; box-shadow: 0 10px 30px rgba(0,0,0,1); border: 1px solid #1a1a1a; }
         canvas { width: 100%; display: block; }
         
-        /* UI Overlay */
         .ui-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; transition: opacity 0.5s; opacity: 1; }
         .ui-hidden { opacity: 0; }
-        #playBtn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.7); border: 1px solid #fff; color: white; width: 65px; height: 65px; border-radius: 50%; font-size: 24px; cursor: pointer; pointer-events: auto; }
+        #playBtn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.7); border: 1px solid #fff; color: white; width: 65px; height: 65px; border-radius: 50%; font-size: 24px; cursor: pointer; pointer-events: auto; z-index: 20; }
         #progress-bar { position: absolute; bottom: 15px; left: 5%; width: 90%; accent-color: #fff; pointer-events: auto; }
 
-        /* Footer tightly under video */
+        /* BRIGHTER, MORE VISIBLE FOOTER */
         .footer { 
             width: 100%; 
-            padding: 15px 0 30px 0; 
-            text-align: center; color: #333; 
-            font-size: 0.8rem; letter-spacing: 3px; 
+            padding: 25px 0 50px 0; 
+            text-align: center; 
+            color: #999; /* Brighter than before */
+            font-weight: bold;
+            font-size: 0.9rem; /* Larger */
+            letter-spacing: 4px; 
             text-transform: uppercase;
+            text-shadow: 0 0 5px rgba(0,0,0,0.5);
         }
     </style>
 </head>
@@ -129,50 +101,64 @@
             'video2': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769255963/lv_0_20260124172757_wdysqo.mp4'
         };
 
-        let activeVideo = document.createElement('video');
-        activeVideo.loop = true; activeVideo.muted = false; activeVideo.playsInline = true; activeVideo.crossOrigin = "anonymous";
-        let hiddenVideo = document.createElement('video');
-        hiddenVideo.muted = false; hiddenVideo.playsInline = true; hiddenVideo.crossOrigin = "anonymous";
+        // FIXED: Only use ONE video element to prevent browser freezing
+        let player = document.createElement('video');
+        player.loop = true; player.muted = false; player.playsInline = true; player.crossOrigin = "anonymous";
+        
+        let currentID = 'video1';
+        player.src = videoMap[currentID];
 
         db.ref('currentVideo').on('value', (snapshot) => {
             const val = snapshot.val() || 'video1';
             document.getElementById('footerText').innerText = "♤rainsonofficial.com";
             
-            if (activeVideo.src.includes(videoMap[val])) {
-                if (!activeVideo.src) activeVideo.src = videoMap[val];
-                return;
+            if (val !== currentID) {
+                const wasPlaying = !player.paused;
+                const currentTime = player.currentTime;
+                
+                currentID = val;
+                player.src = videoMap[val];
+                player.load(); // Prepare the new source
+                player.currentTime = currentTime;
+                
+                if (wasPlaying) {
+                    player.play().catch(e => console.log("Auto-play blocked, waiting for user."));
+                }
             }
-
-            const isPlaying = !activeVideo.paused;
-            hiddenVideo.src = videoMap[val];
-            hiddenVideo.currentTime = activeVideo.currentTime || 0;
-            hiddenVideo.oncanplaythrough = () => {
-                activeVideo.pause();
-                activeVideo = hiddenVideo;
-                if (isPlaying) activeVideo.play().catch(e => {});
-                hiddenVideo = document.createElement('video');
-                hiddenVideo.muted = false; hiddenVideo.playsInline = true; hiddenVideo.crossOrigin = "anonymous";
-            };
         });
 
         function togglePlay(e) { 
             e.stopPropagation(); 
-            if (activeVideo.paused) { activeVideo.play(); playBtn.innerHTML = "||"; } 
-            else { activeVideo.pause(); playBtn.innerHTML = "&#9654;"; } 
+            const btn = document.getElementById('playBtn');
+            if (player.paused) { 
+                player.play(); 
+                btn.innerHTML = "||"; 
+                showUI(); 
+            } else { 
+                player.pause(); 
+                btn.innerHTML = "&#9654;"; 
+                uiOverlay.classList.remove('ui-hidden');
+            } 
         }
         
         let hideTimeout;
         function showUI() { 
             uiOverlay.classList.remove('ui-hidden'); 
             clearTimeout(hideTimeout); 
-            hideTimeout = setTimeout(() => { if (!activeVideo.paused) uiOverlay.classList.add('ui-hidden'); }, 1500); 
+            if (!player.paused) {
+                hideTimeout = setTimeout(() => { uiOverlay.classList.add('ui-hidden'); }, 2000);
+            }
         }
-        canvas.addEventListener('touchstart', showUI);
+
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            showUI();
+        });
         
         function render() {
-            ctx.drawImage(activeVideo, 0, 0, canvas.width, canvas.height);
-            if (!activeVideo.paused && activeVideo.duration) { 
-                document.getElementById('progress-bar').value = (activeVideo.currentTime / activeVideo.duration) * 100; 
+            ctx.drawImage(player, 0, 0, canvas.width, canvas.height);
+            if (!player.paused && player.duration) { 
+                document.getElementById('progress-bar').value = (player.currentTime / player.duration) * 100; 
             }
             requestAnimationFrame(render);
         }
