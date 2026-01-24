@@ -23,7 +23,8 @@
             background: rgba(0, 0, 0, 0.6); 
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             text-align: center; line-height: normal;
-            padding-top: 50px; 
+            /* MOVED DOWN BY 100px */
+            padding-top: 150px; 
             box-sizing: border-box;
         }
 
@@ -42,19 +43,30 @@
 
         .intro-text { font-style: italic; color: #888; font-size: 1.8rem; margin-bottom: 10px; }
         .symbols { font-size: 2.5rem; letter-spacing: 15px; margin-bottom: 15px; }
-        .red { color: #ff3b3b; } 
-        .black { color: #ffffff; }
-
+        
+        /* STABLE VIDEO PLAYER */
         .video-container { 
             position: relative; 
             width: 76%; 
             max-width: 680px; 
+            aspect-ratio: 16/9;
             background: #000; 
             box-shadow: 0 10px 30px rgba(0,0,0,1); 
-            border: 1px solid #1a1a1a; 
+            border: 1px solid #1a1a1a;
+            overflow: hidden;
         }
-        canvas { width: 100%; display: block; cursor: pointer; }
-        
+
+        video {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            object-fit: contain;
+            transition: opacity 0.3s ease;
+        }
+
+        .video-hidden { opacity: 0; pointer-events: none; }
+        .video-visible { opacity: 1; pointer-events: auto; }
+
         #buffer-overlay {
             position: absolute;
             top: 0; left: 0;
@@ -74,16 +86,13 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        .ui-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; transition: opacity 0.5s; opacity: 1; }
+        .ui-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; transition: opacity 0.5s; opacity: 1; z-index: 110; }
         .ui-hidden { opacity: 0; }
-        #playBtn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.7); border: 1px solid #fff; color: white; width: 65px; height: 65px; border-radius: 50%; font-size: 24px; cursor: pointer; pointer-events: auto; z-index: 20; }
+        #playBtn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.7); border: 1px solid #fff; color: white; width: 65px; height: 65px; border-radius: 50%; font-size: 24px; cursor: pointer; pointer-events: auto; }
         #progress-bar { position: absolute; bottom: 15px; left: 5%; width: 90%; accent-color: #fff; pointer-events: auto; }
 
-        .footer { 
-            width: 100%; padding: 25px 0 50px 0; text-align: center; color: #999; 
-            font-weight: bold; font-size: 0.9rem; letter-spacing: 4px; 
-            text-transform: uppercase; text-shadow: 0 0 5px rgba(0,0,0,0.5);
-        }
+        .footer { width: 100%; padding: 25px 0 50px 0; text-align: center; color: #999; font-weight: bold; font-size: 0.9rem; letter-spacing: 4px; text-transform: uppercase; }
+        .red { color: #ff3b3b; } .black { color: #ffffff; }
     </style>
 </head>
 <body>
@@ -98,24 +107,25 @@
 
     <div class="content">
         <div class="pitch">
-            Reality is more flexible than it appears. The Fifth Dimension explores that idea through a discreet, high-level illusion experience, created for private audiences and closed rooms.
+            Reality is more flexible than it appears. The Fifth Dimension explores that idea through a discreet, high-level illusion experience.
         </div>
-
         <div class="intro-text">I made a video for you....</div>
-        <div class="symbols">
-            <span class="black">♠</span> <span class="red">♥</span> <span class="black">♣</span> <span class="red">♦</span>
-        </div>
-        <div class="video-container">
-            <canvas id="magicCanvas" width="1280" height="720"></canvas>
+        <div class="symbols"><span class="black">♠</span> <span class="red">♥</span> <span class="black">♣</span> <span class="red">♦</span></div>
+
+        <div class="video-container" id="v-cont">
+            <video id="playerA" class="video-visible" playsinline crossOrigin="anonymous"></video>
+            <video id="playerB" class="video-hidden" playsinline crossOrigin="anonymous"></video>
+            
             <div id="buffer-overlay"><div class="spinner"></div></div>
+            
             <div class="ui-overlay" id="uiOverlay">
-                <button id="playBtn" onclick="togglePlay(event)">&#9654;</button>
+                <button id="playBtn" onclick="togglePlay()">&#9654;</button>
                 <input type="range" id="progress-bar" min="0" max="100" value="0">
             </div>
         </div>
     </div>
 
-    <div class="footer" id="footerText">♤rainsonofficial</div>
+    <div class="footer">♤rainsonofficial</div>
 
     <script>
         const firebaseConfig = {
@@ -130,25 +140,15 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        const canvas = document.getElementById('magicCanvas');
-        const ctx = canvas.getContext('2d');
-        const progressBar = document.getElementById('progress-bar');
-        const bufferOverlay = document.getElementById('buffer-overlay');
-        
         const videoMap = {
             'video1': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769255934/lv_0_20260124172742_nqtx0o.mp4',
             'video2': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769255963/lv_0_20260124172757_wdysqo.mp4'
         };
 
-        // AUDIO FIX: Two players, only one is ever unmuted
-        let playerA = document.createElement('video');
-        let playerB = document.createElement('video');
-        [playerA, playerB].forEach(v => {
-            v.loop = true; v.muted = true; v.playsInline = true; v.crossOrigin = "anonymous";
-        });
-
-        let activePlayer = playerA;
-        let hiddenPlayer = playerB;
+        let vA = document.getElementById('playerA');
+        let vB = document.getElementById('playerB');
+        let active = vA;
+        let hidden = vB;
         let currentID = 'video1';
         let lastSentTime = 0;
         let isLocked = false;
@@ -156,100 +156,99 @@
         const EXPIRE_AFTER = 5 * 60 * 1000;
         const STOP_VIDEO_AT = 10;
 
-        activePlayer.src = videoMap[currentID];
-        activePlayer.muted = false; // Start first player unmuted
+        vA.src = videoMap['video1'];
 
         db.ref('lastSentTime').on('value', snap => { lastSentTime = snap.val() || 0; });
 
-        progressBar.addEventListener('input', function() {
-            if(isLocked) return;
-            activePlayer.currentTime = (progressBar.value / 100) * activePlayer.duration;
-        });
-
+        // Handle Firebase Swap
         db.ref('currentVideo').on('value', (snapshot) => {
             const val = snapshot.val() || 'video1';
             if (val !== currentID) {
                 isLocked = false;
-                bufferOverlay.style.display = 'none';
+                document.getElementById('buffer-overlay').style.display = 'none';
                 
-                const syncTime = activePlayer.currentTime;
-                const isPlaying = !activePlayer.paused;
+                const syncTime = active.currentTime;
+                const isPlaying = !active.paused;
                 currentID = val;
 
-                // Prepare hidden player (silently)
-                hiddenPlayer.src = videoMap[val];
-                hiddenPlayer.muted = true; 
-                hiddenPlayer.load();
-                hiddenPlayer.currentTime = syncTime;
+                hidden.src = videoMap[val];
+                hidden.currentTime = syncTime;
+                hidden.muted = true;
+                hidden.load();
 
-                hiddenPlayer.oncanplaythrough = () => {
+                hidden.oncanplaythrough = () => {
                     if (isPlaying) {
-                        hiddenPlayer.play().then(() => {
-                            // SWAP
-                            let temp = activePlayer;
-                            activePlayer = hiddenPlayer;
-                            hiddenPlayer = temp;
-
-                            // AUDIO CLEANUP
-                            hiddenPlayer.pause();
-                            hiddenPlayer.muted = true;
-                            activePlayer.muted = false; 
+                        hidden.play().then(() => {
+                            swapPlayers();
                         });
                     } else {
-                        let temp = activePlayer;
-                        activePlayer = hiddenPlayer;
-                        hiddenPlayer = temp;
-                        activePlayer.muted = false;
-                        hiddenPlayer.muted = true;
-                        hiddenPlayer.pause();
+                        swapPlayers();
                     }
-                    hiddenPlayer.oncanplaythrough = null;
+                    hidden.oncanplaythrough = null;
                 };
             }
         });
 
-        function togglePlay(e) { 
-            e.stopPropagation(); 
+        function swapPlayers() {
+            active.classList.replace('video-visible', 'video-hidden');
+            hidden.classList.replace('video-hidden', 'video-visible');
+            
+            active.pause();
+            active.muted = true;
+            
+            let temp = active;
+            active = hidden;
+            hidden = temp;
+            
+            active.muted = false;
+        }
+
+        function togglePlay() {
             if (isLocked) return;
-            if (activePlayer.paused) { 
-                activePlayer.muted = false;
-                activePlayer.play(); 
-                document.getElementById('playBtn').innerHTML = "||"; 
-                showUI(); 
-            } else { 
-                activePlayer.pause(); 
-                document.getElementById('playBtn').innerHTML = "&#9654;"; 
-            } 
-        }
-        
-        let hideTimeout;
-        function showUI() { 
-            uiOverlay.classList.remove('ui-hidden'); 
-            clearTimeout(hideTimeout); 
-            if (!activePlayer.paused) { hideTimeout = setTimeout(() => { uiOverlay.classList.add('ui-hidden'); }, 2000); }
+            if (active.paused) {
+                active.play();
+                document.getElementById('playBtn').innerHTML = "||";
+                hideUIAuto();
+            } else {
+                active.pause();
+                document.getElementById('playBtn').innerHTML = "&#9654;";
+                document.getElementById('uiOverlay').classList.remove('ui-hidden');
+            }
         }
 
-        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); showUI(); });
+        function hideUIAuto() {
+            setTimeout(() => {
+                if (!active.paused) document.getElementById('uiOverlay').classList.add('ui-hidden');
+            }, 2000);
+        }
 
-        function render() {
-            ctx.drawImage(activePlayer, 0, 0, canvas.width, canvas.height);
+        // Lock Logic & Progress Bar
+        setInterval(() => {
+            if (!active.paused && active.duration) {
+                document.getElementById('progress-bar').value = (active.currentTime / active.duration) * 100;
+            }
 
             const timeSinceInput = Date.now() - lastSentTime;
-            if (timeSinceInput > EXPIRE_AFTER && activePlayer.currentTime >= STOP_VIDEO_AT) {
+            if (timeSinceInput > EXPIRE_AFTER && active.currentTime >= STOP_VIDEO_AT) {
                 isLocked = true;
-                activePlayer.pause();
-                activePlayer.muted = true; // Silence on lock
-                activePlayer.currentTime = STOP_VIDEO_AT;
-                bufferOverlay.style.display = 'flex';
+                active.pause();
+                active.currentTime = STOP_VIDEO_AT;
+                document.getElementById('buffer-overlay').style.display = 'flex';
                 document.getElementById('playBtn').innerHTML = "&#9654;";
+                document.getElementById('uiOverlay').classList.remove('ui-hidden');
             }
+        }, 100);
 
-            if (!activePlayer.paused && activePlayer.duration) { 
-                progressBar.value = (activePlayer.currentTime / activePlayer.duration) * 100; 
-            }
-            requestAnimationFrame(render);
-        }
-        render();
+        document.getElementById('v-cont').onclick = () => {
+            document.getElementById('uiOverlay').classList.remove('ui-hidden');
+            hideUIAuto();
+        };
+
+        document.getElementById('progress-bar').oninput = (e) => {
+            if (isLocked) return;
+            active.currentTime = (e.target.value / 100) * active.duration;
+        };
     </script>
 </body>
 </html>
+
