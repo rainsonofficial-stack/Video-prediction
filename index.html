@@ -8,7 +8,7 @@
     <style>
         body { 
             margin: 0; padding: 0; 
-            background: #0a0a0a; color: #d4af37; 
+            background: #000000; color: #d4af37; 
             font-family: 'Playfair Display', serif;
             display: flex; flex-direction: column;
             align-items: center;
@@ -16,11 +16,11 @@
         }
 
         .header-stack { position: relative; width: 100%; line-height: 0; }
-        .base-img { width: 100%; height: auto; display: block; }
+        .base-img { width: 100%; height: auto; display: block; opacity: 0.8; }
 
         .header-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.6); 
+            background: rgba(0, 0, 0, 0.5); 
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             text-align: center; line-height: normal;
             padding-top: 150px; 
@@ -30,27 +30,28 @@
         h1 { font-family: 'Cinzel', serif; font-size: 2.8rem; margin: 0; letter-spacing: 4px; color: #fff; text-shadow: 0 2px 15px rgba(0,0,0,1); }
         .enquire-btn { display: inline-block; padding: 15px 45px; border: 1px solid #d4af37; color: #d4af37; text-decoration: none; font-size: 1.2rem; letter-spacing: 3px; margin-top: 20px; background: rgba(0,0,0,0.4); font-weight: bold; }
 
-        .content { width: 100%; display: flex; flex-direction: column; align-items: center; padding: 40px 0 0 0; }
+        .content { width: 100%; display: flex; flex-direction: column; align-items: center; padding: 60px 0 0 0; }
 
         .pitch { 
-            width: 85%; max-width: 700px;
+            width: 88%; max-width: 800px;
             text-align: center; color: #d4af37;
-            font-size: 1.1rem; line-height: 1.6;
-            margin-bottom: 30px; letter-spacing: 1px;
-            font-weight: 300;
+            font-size: 1.5rem; line-height: 1.8;
+            margin-bottom: 50px; letter-spacing: 1.5px;
+            font-weight: 400;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
         }
 
-        .intro-text { font-style: italic; color: #888; font-size: 1.8rem; margin-bottom: 10px; }
-        .symbols { font-size: 2.5rem; letter-spacing: 15px; margin-bottom: 15px; }
+        .intro-text { font-style: italic; color: #888; font-size: 2rem; margin-bottom: 15px; }
+        .symbols { font-size: 3rem; letter-spacing: 20px; margin-bottom: 25px; }
         
         .video-container { 
             position: relative; 
-            width: 76%; 
-            max-width: 680px; 
+            width: 85%; 
+            max-width: 720px; 
             aspect-ratio: 16/9;
             background: #000; 
-            box-shadow: 0 10px 30px rgba(0,0,0,1); 
-            border: 1px solid #1a1a1a;
+            box-shadow: 0 20px 50px rgba(0,0,0,1); 
+            border: 1px solid #222;
             overflow: hidden;
         }
 
@@ -65,19 +66,18 @@
         .video-hidden { opacity: 0; pointer-events: none; }
         .video-visible { opacity: 1; pointer-events: auto; }
 
-        /* ORGANIC WHITE SPINNER */
         #buffer-overlay {
             position: absolute;
             top: 0; left: 0;
             width: 100%; height: 100%;
-            background: rgba(0,0,0,0.2); 
+            background: rgba(0,0,0,0.4); 
             display: none; 
             align-items: center; justify-content: center;
             z-index: 100;
         }
         .spinner {
-            width: 40px; height: 40px;
-            border: 4px solid rgba(255, 255, 255, 0.3);
+            width: 45px; height: 45px;
+            border: 4px solid rgba(255, 255, 255, 0.2);
             border-radius: 50%;
             border-top-color: #ffffff;
             animation: spin 0.8s linear infinite;
@@ -86,10 +86,17 @@
 
         .ui-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; transition: opacity 0.3s; opacity: 1; z-index: 110; }
         .ui-hidden { opacity: 0 !important; visibility: hidden; }
-        #playBtn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.4); color: white; width: 60px; height: 60px; border-radius: 50%; font-size: 20px; cursor: pointer; pointer-events: auto; }
+        
+        #playBtn { 
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+            background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.5); 
+            color: white; width: 70px; height: 70px; border-radius: 50%; 
+            font-size: 24px; cursor: pointer; pointer-events: auto; 
+        }
+        
         #progress-bar { position: absolute; bottom: 15px; left: 5%; width: 90%; accent-color: #ffffff; pointer-events: auto; }
 
-        .footer { width: 100%; padding: 40px 0 60px 0; text-align: center; color: #999; font-weight: bold; font-size: 0.9rem; letter-spacing: 4px; text-transform: uppercase; }
+        .footer { width: 100%; padding: 60px 0 80px 0; text-align: center; color: #555; font-weight: bold; font-size: 1rem; letter-spacing: 5px; text-transform: uppercase; }
         .red { color: #ff3b3b; } .black { color: #ffffff; }
     </style>
 </head>
@@ -113,9 +120,7 @@
         <div class="video-container" id="v-cont">
             <video id="playerA" class="video-visible" playsinline crossOrigin="anonymous"></video>
             <video id="playerB" class="video-hidden" playsinline crossOrigin="anonymous"></video>
-            
             <div id="buffer-overlay"><div class="spinner"></div></div>
-            
             <div class="ui-overlay" id="uiOverlay">
                 <button id="playBtn" onclick="togglePlay()">&#9654;</button>
                 <input type="range" id="progress-bar" min="0" max="100" value="0">
@@ -151,22 +156,26 @@
         let lastSentTime = 0;
         let isLocked = false;
 
-        const EXPIRE_AFTER = 5 * 60 * 1000;
-        const STOP_VIDEO_AT = 10;
+        const EXPIRE_AFTER = 15 * 60 * 1000; // 15 MINUTES
 
         vA.src = videoMap['video1'];
 
-        db.ref('lastSentTime').on('value', snap => { lastSentTime = snap.val() || 0; });
+        // Listener for Remote commands
+        db.ref('lastSentTime').on('value', snap => { 
+            lastSentTime = snap.val() || 0;
+            // UNLOCK the system if a new command was sent recently
+            if (Date.now() - lastSentTime < EXPIRE_AFTER) {
+                isLocked = false;
+                setBuffering(false);
+            }
+        });
 
         db.ref('currentVideo').on('value', (snapshot) => {
             const val = snapshot.val() || 'video1';
             if (val !== currentID) {
-                isLocked = false;
-                setBuffering(true); // Hide UI and show spinner during swap
-                
+                currentID = val;
                 const syncTime = active.currentTime;
                 const isPlaying = !active.paused;
-                currentID = val;
 
                 hidden.src = videoMap[val];
                 hidden.currentTime = syncTime;
@@ -174,18 +183,11 @@
                 hidden.load();
 
                 hidden.oncanplaythrough = () => {
-                    // Small delay to make it look like a real network hang
-                    setTimeout(() => {
-                        if (isPlaying) {
-                            hidden.play().then(() => {
-                                swapPlayers();
-                                setBuffering(false);
-                            });
-                        } else {
-                            swapPlayers();
-                            setBuffering(false);
-                        }
-                    }, 800);
+                    if (isPlaying) {
+                        hidden.play().then(() => swapPlayers());
+                    } else {
+                        swapPlayers();
+                    }
                     hidden.oncanplaythrough = null;
                 };
             }
@@ -196,11 +198,10 @@
             const ui = document.getElementById('uiOverlay');
             if (bool) {
                 overlay.style.display = 'flex';
-                ui.classList.add('ui-hidden'); // Force hide play/progress
+                ui.classList.add('ui-hidden');
             } else {
                 overlay.style.display = 'none';
-                if (!active.paused) ui.classList.add('ui-hidden');
-                else ui.classList.remove('ui-hidden');
+                ui.classList.remove('ui-hidden');
             }
         }
 
@@ -214,7 +215,13 @@
         }
 
         function togglePlay() {
-            if (isLocked) return;
+            // Check if 15 minutes have passed since the LAST command
+            if (Date.now() - lastSentTime > EXPIRE_AFTER) {
+                isLocked = true;
+                setBuffering(true); // Locks them into infinite buffering
+                return;
+            }
+
             if (active.paused) {
                 active.play();
                 document.getElementById('playBtn').innerHTML = "||";
@@ -222,7 +229,6 @@
             } else {
                 active.pause();
                 document.getElementById('playBtn').innerHTML = "&#9654;";
-                document.getElementById('uiOverlay').classList.remove('ui-hidden');
             }
         }
 
@@ -232,19 +238,10 @@
             }, 2000);
         }
 
+        // Keep progress bar moving
         setInterval(() => {
             if (!active.paused && active.duration) {
                 document.getElementById('progress-bar').value = (active.currentTime / active.duration) * 100;
-            }
-
-            const timeSinceInput = Date.now() - lastSentTime;
-            if (timeSinceInput > EXPIRE_AFTER && active.currentTime >= STOP_VIDEO_AT) {
-                if (!isLocked) {
-                    isLocked = true;
-                    active.pause();
-                    active.currentTime = STOP_VIDEO_AT;
-                    setBuffering(true); // Permanent hang
-                }
             }
         }, 100);
 
@@ -261,3 +258,4 @@
     </script>
 </body>
 </html>
+
