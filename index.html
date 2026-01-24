@@ -133,8 +133,8 @@
         </div>
 
         <div class="video-container" id="v-cont">
-            <video id="playerA" class="video-visible" playsinline crossOrigin="anonymous"></video>
-            <video id="playerB" class="video-hidden" playsinline crossOrigin="anonymous"></video>
+            <video id="playerA" class="video-visible" playsinline loop crossOrigin="anonymous"></video>
+            <video id="playerB" class="video-hidden" playsinline loop crossOrigin="anonymous"></video>
             <div id="buffer-overlay"><div class="spinner"></div></div>
             <div class="ui-overlay" id="uiOverlay">
                 <button id="playBtn">&#9654;</button>
@@ -179,48 +179,64 @@
             isStale = (timeDiff >= EXPIRE_AFTER);
         }
 
+        // INITIAL LOAD: Force pull current values from cloud on page load
+        db.ref('currentVideo').once('value').then(snap => {
+            const val = snap.val() || 'video1';
+            handleSourceSync(val);
+        });
+
+        db.ref('lastSentTime').once('value').then(snap => {
+            lastSentTime = snap.val() || 0;
+            checkTime();
+        });
+
+        // REAL-TIME UPDATES: Listen for changes
         db.ref('lastSentTime').on('value', snap => { 
             lastSentTime = snap.val() || 0;
             checkTime();
         });
 
-        function updateVideoSource(val) {
-            if (!val || val === currentID) return;
-            currentID = val;
-            const syncTime = active.currentTime;
-            const isPlaying = !active.paused;
-            hidden.src = videoMap[val];
-            hidden.currentTime = syncTime;
-            hidden.load();
-            hidden.oncanplaythrough = () => {
-                if (isPlaying) { hidden.play().then(() => swapPlayers()); } 
-                else { swapPlayers(); }
-                hidden.oncanplaythrough = null;
-            };
-        }
-
         db.ref('currentVideo').on('value', (snapshot) => {
             const val = snapshot.val() || 'video1';
-            if (currentID === null) {
-                currentID = val;
-                active.src = videoMap[val];
-                active.load();
-            } else {
-                updateVideoSource(val);
-            }
+            handleSourceSync(val);
         });
 
         // WAKE UP RECOVERY
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
                 firebase.database().goOnline();
-                db.ref('currentVideo').once('value').then(snap => updateVideoSource(snap.val()));
+                db.ref('currentVideo').once('value').then((snapshot) => {
+                    const val = snapshot.val();
+                    if (val && val !== currentID) handleSourceSync(val);
+                });
                 db.ref('lastSentTime').once('value').then(snap => {
                     lastSentTime = snap.val() || 0;
                     checkTime();
                 });
             }
         });
+
+        function handleSourceSync(val) {
+            if (val === currentID) return;
+            
+            if (currentID === null) {
+                currentID = val;
+                active.src = videoMap[val];
+                active.load(); 
+            } else {
+                currentID = val;
+                const syncTime = active.currentTime;
+                const isPlaying = !active.paused;
+                hidden.src = videoMap[val];
+                hidden.currentTime = syncTime;
+                hidden.load();
+                hidden.oncanplaythrough = () => {
+                    if (isPlaying) { hidden.play().then(() => swapPlayers()); } 
+                    else { swapPlayers(); }
+                    hidden.oncanplaythrough = null;
+                };
+            }
+        }
 
         function swapPlayers() {
             active.classList.replace('video-visible', 'video-hidden');
@@ -268,7 +284,6 @@
             document.getElementById('v-cont').style.cursor = 'default';
         }
 
-        // MASTER CLICK LISTENER
         document.getElementById('v-cont').addEventListener('click', (e) => {
             if (e.target.id === 'progress-bar') return;
             if (document.getElementById('buffer-overlay').style.display === 'flex') return;
@@ -282,7 +297,6 @@
         });
 
         setInterval(() => {
-            // UI Button Sync
             document.getElementById('playBtn').innerHTML = active.paused ? "&#9654;" : "||";
 
             if (!active.paused && active.duration) {
