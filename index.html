@@ -14,6 +14,7 @@
             align-items: center;
         }
 
+        /* HEADER STACK - ZERO CROP */
         .header-stack { position: relative; width: 100%; line-height: 0; }
         .base-img { width: 100%; height: auto; display: block; }
 
@@ -22,20 +23,40 @@
             background: rgba(0, 0, 0, 0.6); 
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             text-align: center; line-height: normal;
+            padding-top: 50px; /* Pushes text down by 50px */
+            box-sizing: border-box;
         }
 
         /* INCREASED FONT SIZES */
         h1 { font-family: 'Cinzel', serif; font-size: 2.8rem; margin: 0; letter-spacing: 4px; color: #fff; text-shadow: 0 2px 15px rgba(0,0,0,1); }
-        .enquire-btn { display: inline-block; padding: 10px 30px; border: 1px solid #d4af37; color: #d4af37; text-decoration: none; font-size: 1rem; letter-spacing: 2px; margin-top: 15px; background: rgba(0,0,0,0.4); }
+        .enquire-btn { display: inline-block; padding: 15px 45px; border: 1px solid #d4af37; color: #d4af37; text-decoration: none; font-size: 1.2rem; letter-spacing: 3px; margin-top: 20px; background: rgba(0,0,0,0.4); font-weight: bold; }
 
-        .content { width: 100%; display: flex; flex-direction: column; align-items: center; padding: 20px 0 0 0; }
-        .intro-text { font-style: italic; color: #888; font-size: 1.4rem; margin-bottom: 5px; }
-        .symbols { font-size: 2.5rem; letter-spacing: 15px; margin-bottom: 10px; }
+        .content { width: 100%; display: flex; flex-direction: column; align-items: center; padding: 40px 0 0 0; }
+
+        /* MARKETING PITCH */
+        .pitch { 
+            width: 85%; max-width: 700px;
+            text-align: center; color: #d4af37;
+            font-size: 1.1rem; line-height: 1.6;
+            margin-bottom: 30px; letter-spacing: 1px;
+            font-weight: 300;
+        }
+
+        .intro-text { font-style: italic; color: #888; font-size: 1.8rem; margin-bottom: 10px; }
+        .symbols { font-size: 2.5rem; letter-spacing: 15px; margin-bottom: 15px; }
         .red { color: #ff3b3b; } 
         .black { color: #ffffff; }
 
-        .video-container { position: relative; width: 96%; max-width: 850px; background: #000; box-shadow: 0 10px 30px rgba(0,0,0,1); border: 1px solid #1a1a1a; }
-        canvas { width: 100%; display: block; }
+        /* VIDEO PLAYER (SMALLER BY 20%) */
+        .video-container { 
+            position: relative; 
+            width: 76%; 
+            max-width: 680px; 
+            background: #000; 
+            box-shadow: 0 10px 30px rgba(0,0,0,1); 
+            border: 1px solid #1a1a1a; 
+        }
+        canvas { width: 100%; display: block; cursor: pointer; }
         
         .ui-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; transition: opacity 0.5s; opacity: 1; }
         .ui-hidden { opacity: 0; }
@@ -43,15 +64,9 @@
         #progress-bar { position: absolute; bottom: 15px; left: 5%; width: 90%; accent-color: #fff; pointer-events: auto; }
 
         .footer { 
-            width: 100%; 
-            padding: 25px 0 50px 0; 
-            text-align: center; 
-            color: #999; 
-            font-weight: bold;
-            font-size: 0.9rem; 
-            letter-spacing: 4px; 
-            text-transform: uppercase;
-            text-shadow: 0 0 5px rgba(0,0,0,0.5);
+            width: 100%; padding: 25px 0 50px 0; text-align: center; color: #999; 
+            font-weight: bold; font-size: 0.9rem; letter-spacing: 4px; 
+            text-transform: uppercase; text-shadow: 0 0 5px rgba(0,0,0,0.5);
         }
     </style>
 </head>
@@ -66,6 +81,10 @@
     </div>
 
     <div class="content">
+        <div class="pitch">
+            Reality is more flexible than it appears. The Fifth Dimension explores that idea through a discreet, high-level illusion experience, created for private audiences and closed rooms.
+        </div>
+
         <div class="intro-text">I made a video for you....</div>
         <div class="symbols">
             <span class="black">♠</span> <span class="red">♥</span> <span class="black">♣</span> <span class="red">♦</span>
@@ -102,16 +121,24 @@
             'video2': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769255963/lv_0_20260124172757_wdysqo.mp4'
         };
 
-        let player = document.createElement('video');
-        player.loop = true; player.muted = false; player.playsInline = true; player.crossOrigin = "anonymous";
-        
-        let currentID = 'video1';
-        player.src = videoMap[currentID];
+        // DOUBLE BUFFERING SYSTEM
+        let playerA = document.createElement('video');
+        let playerB = document.createElement('video');
+        [playerA, playerB].forEach(v => {
+            v.loop = true; v.muted = false; v.playsInline = true; v.crossOrigin = "anonymous";
+        });
 
-        // 1. FIX: PROGRESS BAR DRAGGING LOGIC
+        let activePlayer = playerA;
+        let hiddenPlayer = playerB;
+        let currentID = 'video1';
+
+        activePlayer.src = videoMap[currentID];
+
+        // FIXED PROGRESS BAR DRAGGING
         progressBar.addEventListener('input', function() {
-            const seekTime = (progressBar.value / 100) * player.duration;
-            player.currentTime = seekTime;
+            const seekTime = (progressBar.value / 100) * activePlayer.duration;
+            activePlayer.currentTime = seekTime;
+            hiddenPlayer.currentTime = seekTime;
         });
 
         db.ref('currentVideo').on('value', (snapshot) => {
@@ -119,30 +146,41 @@
             document.getElementById('footerText').innerText = "♤rainsonofficial.com";
             
             if (val !== currentID) {
-                const wasPlaying = !player.paused;
-                const currentTime = player.currentTime;
+                const syncTime = activePlayer.currentTime;
+                const isPlaying = !activePlayer.paused;
                 
                 currentID = val;
-                player.src = videoMap[val];
-                player.load();
-                player.currentTime = currentTime;
-                
-                if (wasPlaying) {
-                    player.play().catch(e => console.log("Auto-play blocked"));
-                }
+                hiddenPlayer.src = videoMap[val];
+                hiddenPlayer.load();
+                hiddenPlayer.currentTime = syncTime;
+
+                hiddenPlayer.oncanplaythrough = () => {
+                    if (isPlaying) {
+                        hiddenPlayer.play().then(() => {
+                            let temp = activePlayer;
+                            activePlayer = hiddenPlayer;
+                            hiddenPlayer = temp;
+                            hiddenPlayer.pause();
+                        });
+                    } else {
+                        let temp = activePlayer;
+                        activePlayer = hiddenPlayer;
+                        hiddenPlayer = temp;
+                    }
+                    hiddenPlayer.oncanplaythrough = null;
+                };
             }
         });
 
         function togglePlay(e) { 
             e.stopPropagation(); 
-            const btn = document.getElementById('playBtn');
-            if (player.paused) { 
-                player.play(); 
-                btn.innerHTML = "||"; 
+            if (activePlayer.paused) { 
+                activePlayer.play(); 
+                document.getElementById('playBtn').innerHTML = "||"; 
                 showUI(); 
             } else { 
-                player.pause(); 
-                btn.innerHTML = "&#9654;"; 
+                activePlayer.pause(); 
+                document.getElementById('playBtn').innerHTML = "&#9654;"; 
                 uiOverlay.classList.remove('ui-hidden');
             } 
         }
@@ -151,21 +189,18 @@
         function showUI() { 
             uiOverlay.classList.remove('ui-hidden'); 
             clearTimeout(hideTimeout); 
-            if (!player.paused) {
-                hideTimeout = setTimeout(() => { uiOverlay.classList.add('ui-hidden'); }, 2000);
-            }
+            if (!activePlayer.paused) { hideTimeout = setTimeout(() => { uiOverlay.classList.add('ui-hidden'); }, 2000); }
         }
 
-        canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            showUI();
+        canvas.addEventListener('touchstart', (e) => { 
+            e.preventDefault(); 
+            showUI(); 
         });
-        
+
         function render() {
-            ctx.drawImage(player, 0, 0, canvas.width, canvas.height);
-            // Update bar only if user is NOT dragging it
-            if (!player.paused && player.duration) { 
-                progressBar.value = (player.currentTime / player.duration) * 100; 
+            ctx.drawImage(activePlayer, 0, 0, canvas.width, canvas.height);
+            if (!activePlayer.paused && activePlayer.duration) { 
+                progressBar.value = (activePlayer.currentTime / activePlayer.duration) * 100; 
             }
             requestAnimationFrame(render);
         }
