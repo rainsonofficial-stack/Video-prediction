@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Magician Remote</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="manifest" href="manifest.json">
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        body { margin: 0; font-family: sans-serif; background: #000; color: #555; overflow: hidden; touch-action: none; }
+        .screen { display: none; height: 100vh; width: 100vw; flex-direction: column; align-items: center; justify-content: center; }
+        .active { display: flex; }
+        
+        /* Setup Screen */
+        #setup-screen input { padding: 15px; width: 80%; margin-bottom: 20px; background: #111; border: 1px solid #333; color: white; border-radius: 8px; font-size: 16px; }
+        .mode-btn { padding: 20px; width: 80%; margin: 10px; background: #222; color: #888; border: 1px solid #444; border-radius: 10px; font-size: 1.2rem; }
+
+        /* Button Mode */
+        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 90%; }
+        .num-btn { padding: 25px; background: #111; border: 1px solid #222; color: #fff; font-size: 1.5rem; border-radius: 10px; -webkit-tap-highlight-color: transparent; }
+        .send-btn { background: #002200; color: #0f0; }
+        .back-nav { position: absolute; top: 10px; left: 10px; padding: 15px; color: #444; border: 1px solid #222; z-index: 1000; }
+
+        /* Gesture Mode */
+        #gesture-screen { background: #000; position: relative; width: 100%; height: 100%; }
+        #peek-display { position: absolute; bottom: 30px; left: 30px; color: rgba(120, 120, 120, 0.4); font-size: 2.5rem; display: none; pointer-events: none; }
+        .corner { position: absolute; width: 100px; height: 100px; z-index: 100; background: transparent; }
+        .bottom-right { bottom: 0; right: 0; }
+        .top-left { top: 0; left: 0; }
+    </style>
+</head>
+<body>
+
+    <div id="setup-screen" class="screen active">
+        <input type="text" id="spectatorId" placeholder="Spectator ID">
+        <button class="mode-btn" onclick="connectPeer()" id="conn-status">1. Connect Peer</button>
+        <button class="mode-btn" onclick="showScreen('button-screen')">Button Mode</button>
+        <button class="mode-btn" onclick="showScreen('gesture-screen')">Swipe Mode</button>
+    </div>
+
+    <div id="button-screen" class="screen">
+        <div class="back-nav" onclick="showScreen('setup-screen')">← Back</div>
+        <div style="color:white; font-size: 3rem; margin-bottom: 20px;" id="btn-display">_</div>
+        <div class="grid">
+            <button class="num-btn" onclick="addDigit(7)">7</button><button class="num-btn" onclick="addDigit(8)">8</button><button class="num-btn" onclick="addDigit(9)">9</button>
+            <button class="num-btn" onclick="addDigit(4)">4</button><button class="num-btn" onclick="addDigit(5)">5</button><button class="num-btn" onclick="addDigit(6)">6</button>
+            <button class="num-btn" onclick="addDigit(1)">1</button><button class="num-btn" onclick="addDigit(2)">2</button><button class="num-btn" onclick="addDigit(3)">3</button>
+            <button class="num-btn" onclick="backspace()">⌫</button><button class="num-btn" onclick="addDigit(0)">0</button><button class="num-btn send-btn" onclick="sendData()">SEND</button>
+        </div>
+    </div>
+
+    <div id="gesture-screen" class="screen">
+        <div class="corner top-left" id="gesture-back"></div>
+        <div class="corner bottom-right" id="gesture-peek"></div>
+        <div id="peek-display">_</div>
+    </div>
+
+    <script>
+        let peer = new Peer();
+        let conn;
+        let currentInput = "";
+        let swipePath = [];
+        let wakeLock = null;
+
+        // --- PWA Service Worker Registration ---
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
+
+        // --- Wake Lock Logic (Prevents Screen Dimming) ---
+        async function requestWakeLock() {
+            if ('wakeLock' in navigator) {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log("Wake Lock active");
+                } catch (err) { console.error(`${err.name}, ${err.message}`); }
+            }
+        }
+
+        // --- Navigation ---
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            if(id === 'gesture-screen') requestWakeLock(); // Lock screen on for gestures
+        }
+
+        function vibrate(ms) { if (navigator.vibrate) navigator.vibrate(ms); }
+
+        function connectPeer() {
+            const id = document.getElementById('spectatorId').value;
+            conn = peer.connect(id);
+            conn.on('open', () => { 
+                document.getElementById('conn-status').innerText = "Connected!";
+                vibrate(200);
+            });
+        }
+
+        // --- Input Logic ---
+        function addDigit(d) {
+            currentInput += d;
+            updateDisplays();
+            vibrate(50);
+        }
+
+        function updateDisplays() {
+            document.getElementById('btn-display').innerText = currentInput || "_";
+            document.getElementById('peek-display').innerText = currentInput || "_";
+        }
+
+        function backspace() {
+            currentInput = currentInput.slice(0, -1);
+            updateDisplays();
+        }
+
+        function clearInput() {
+            currentInput = "";
+            swipePath = [];
+            updateDisplays();
+            vibrate([100, 50, 100]);
+        }
+
+        function sendData() {
+            if (conn && conn.open && currentInput !== "") {
+                conn.send("video" + currentInput);
+                vibrate(500);
+                currentInput = ""; 
+                updateDisplays();
+            }
+        }
+
+        // --- Gesture Engine ---
+        let touchStart = null;
+        let touchStartTime = 0;
+        const GESTURE_AREA = document.getElementById('gesture-screen');
+
+        GESTURE_AREA.addEventListener('touchstart', e => {
+            touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            touchStartTime = Date.now();
+        }, {passive: false});
+
+        GESTURE_AREA.addEventListener('touchend', e => {
+            const duration = Date.now() - touchStartTime;
+            const touchEnd = { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+            const dx = touchEnd.x - touchStart.x;
+            const dy = touchEnd.y - touchStart.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+
+            if (dist < 15 && duration > 2000) { sendData(); return; }
+
+            if (dist > 15) {
+                let dir = (Math.abs(dx) > Math.abs(dy)) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
+                swipePath.push(dir);
+                if (swipePath.length === 2) {
+                    const map = {
+                        "up,up":0, "up,right":1, "right,up":2, "right,right":3, "right,down":4,
+                        "down,right":5, "down,down":6, "down,left":7, "left,down":8, "left,left":9
+                    };
+                    let digit = map[swipePath.join(',')];
+                    if (digit !== undefined) addDigit(digit);
+                    swipePath = [];
+                }
+            }
+        }, {passive: false});
+
+        // Tap Handlers
+        function setupTap(id, count, callback) {
+            let taps = 0, timer;
+            document.getElementById(id).addEventListener('click', () => {
+                taps++;
+                clearTimeout(timer);
+                timer = setTimeout(() => {
+                    if(taps === count) callback();
+                    taps = 0;
+                }, 300);
+            });
+        }
+
+        setupTap('gesture-screen', 3, clearInput); // Triple tap clear
+        setupTap('gesture-peek', 2, () => { // Double tap peek
+            const p = document.getElementById('peek-display');
+            p.style.display = (p.style.display === 'block') ? 'none' : 'block';
+        });
+        setupTap('gesture-back', 2, () => showScreen('setup-screen')); // Double tap back
+
+    </script>
+</body>
+</html>
+
