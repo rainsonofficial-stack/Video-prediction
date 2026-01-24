@@ -24,12 +24,13 @@
             text-align: center; line-height: normal;
         }
 
-        h1 { font-family: 'Cinzel', serif; font-size: 2.2rem; margin: 0; letter-spacing: 4px; color: #fff; text-shadow: 0 2px 15px rgba(0,0,0,1); }
-        .enquire-btn { display: inline-block; padding: 8px 25px; border: 1px solid #d4af37; color: #d4af37; text-decoration: none; font-size: 0.8rem; letter-spacing: 2px; margin-top: 15px; background: rgba(0,0,0,0.4); }
+        /* INCREASED FONT SIZES */
+        h1 { font-family: 'Cinzel', serif; font-size: 2.8rem; margin: 0; letter-spacing: 4px; color: #fff; text-shadow: 0 2px 15px rgba(0,0,0,1); }
+        .enquire-btn { display: inline-block; padding: 10px 30px; border: 1px solid #d4af37; color: #d4af37; text-decoration: none; font-size: 1rem; letter-spacing: 2px; margin-top: 15px; background: rgba(0,0,0,0.4); }
 
         .content { width: 100%; display: flex; flex-direction: column; align-items: center; padding: 20px 0 0 0; }
-        .intro-text { font-style: italic; color: #888; font-size: 1.1rem; margin-bottom: 5px; }
-        .symbols { font-size: 1.8rem; letter-spacing: 12px; margin-bottom: 10px; }
+        .intro-text { font-style: italic; color: #888; font-size: 1.4rem; margin-bottom: 5px; }
+        .symbols { font-size: 2.5rem; letter-spacing: 15px; margin-bottom: 10px; }
         .red { color: #ff3b3b; } 
         .black { color: #ffffff; }
 
@@ -41,14 +42,13 @@
         #playBtn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.7); border: 1px solid #fff; color: white; width: 65px; height: 65px; border-radius: 50%; font-size: 24px; cursor: pointer; pointer-events: auto; z-index: 20; }
         #progress-bar { position: absolute; bottom: 15px; left: 5%; width: 90%; accent-color: #fff; pointer-events: auto; }
 
-        /* BRIGHTER, MORE VISIBLE FOOTER */
         .footer { 
             width: 100%; 
             padding: 25px 0 50px 0; 
             text-align: center; 
-            color: #999; /* Brighter than before */
+            color: #999; 
             font-weight: bold;
-            font-size: 0.9rem; /* Larger */
+            font-size: 0.9rem; 
             letter-spacing: 4px; 
             text-transform: uppercase;
             text-shadow: 0 0 5px rgba(0,0,0,0.5);
@@ -96,17 +96,23 @@
 
         const canvas = document.getElementById('magicCanvas');
         const ctx = canvas.getContext('2d');
+        const progressBar = document.getElementById('progress-bar');
         const videoMap = {
             'video1': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769255934/lv_0_20260124172742_nqtx0o.mp4',
             'video2': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769255963/lv_0_20260124172757_wdysqo.mp4'
         };
 
-        // FIXED: Only use ONE video element to prevent browser freezing
         let player = document.createElement('video');
         player.loop = true; player.muted = false; player.playsInline = true; player.crossOrigin = "anonymous";
         
         let currentID = 'video1';
         player.src = videoMap[currentID];
+
+        // 1. FIX: PROGRESS BAR DRAGGING LOGIC
+        progressBar.addEventListener('input', function() {
+            const seekTime = (progressBar.value / 100) * player.duration;
+            player.currentTime = seekTime;
+        });
 
         db.ref('currentVideo').on('value', (snapshot) => {
             const val = snapshot.val() || 'video1';
@@ -118,11 +124,11 @@
                 
                 currentID = val;
                 player.src = videoMap[val];
-                player.load(); // Prepare the new source
+                player.load();
                 player.currentTime = currentTime;
                 
                 if (wasPlaying) {
-                    player.play().catch(e => console.log("Auto-play blocked, waiting for user."));
+                    player.play().catch(e => console.log("Auto-play blocked"));
                 }
             }
         });
@@ -157,8 +163,9 @@
         
         function render() {
             ctx.drawImage(player, 0, 0, canvas.width, canvas.height);
+            // Update bar only if user is NOT dragging it
             if (!player.paused && player.duration) { 
-                document.getElementById('progress-bar').value = (player.currentTime / player.duration) * 100; 
+                progressBar.value = (player.currentTime / player.duration) * 100; 
             }
             requestAnimationFrame(render);
         }
@@ -166,4 +173,3 @@
     </script>
 </body>
 </html>
-
