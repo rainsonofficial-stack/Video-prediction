@@ -2,152 +2,130 @@
 <html>
 <head>
     <title>Luxury Illusionist</title>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Playfair+Display:ital@0;1&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; background: #0a0a0a; color: #d4af37; font-family: 'Playfair Display', serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; overflow-x: hidden; }
-        
-        .header { text-align: center; margin-top: 40px; }
-        h1 { font-family: 'Cinzel', serif; font-size: 3rem; margin-bottom: 5px; letter-spacing: 4px; color: #fff; }
-        .enquire-btn { display: inline-block; padding: 10px 25px; border: 1px solid #d4af37; color: #d4af37; text-decoration: none; font-size: 0.8rem; letter-spacing: 2px; transition: 0.3s; margin-top: 10px; }
+        body { margin: 0; background: #0a0a0a; color: #d4af37; font-family: 'Playfair Display', serif; display: flex; flex-direction: column; min-height: 100vh; overflow-x: hidden; }
+        .header { text-align: center; padding: 120px 20px; background: linear-gradient(rgba(10,10,10,0.7), rgba(10,10,10,0.7)), url('illusion.jpg'); background-size: cover; background-position: center; width: 100%; box-sizing: border-box; }
+        h1 { font-family: 'Cinzel', serif; font-size: 3.5rem; margin-bottom: 5px; letter-spacing: 6px; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.8); }
+        .enquire-btn { display: inline-block; padding: 12px 30px; border: 1px solid #d4af37; color: #d4af37; text-decoration: none; font-size: 0.9rem; letter-spacing: 3px; transition: 0.3s; margin-top: 20px; background: rgba(0,0,0,0.5); }
         .enquire-btn:hover { background: #d4af37; color: #000; }
-
-        .content { margin-top: 60px; text-align: center; width: 70%; position: relative; }
+        .spacer { flex-grow: 1; }
+        .content { text-align: center; width: 70%; margin: 0 auto 80px auto; position: relative; }
         .intro-text { font-style: italic; color: #aaa; margin-bottom: 10px; font-size: 1.2rem; }
         .symbols { font-size: 1.5rem; letter-spacing: 15px; margin-bottom: 20px; color: #fff; }
-
         .video-container { position: relative; width: 100%; border-radius: 2px; box-shadow: 0 20px 50px rgba(0,0,0,0.9); background: #000; }
-        canvas { width: 100%; display: block; cursor: pointer; }
-
+        canvas { width: 100%; display: block; }
         .ui-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; transition: opacity 0.5s ease; opacity: 1; z-index: 10; }
         .ui-hidden { opacity: 0; }
-        
-        #playBtn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.4); border: 1px solid #fff; color: white; width: 70px; height: 70px; border-radius: 50%; font-size: 24px; cursor: pointer; pointer-events: auto; }
+        #playBtn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.6); border: 1px solid #fff; color: white; width: 80px; height: 80px; border-radius: 50%; font-size: 28px; cursor: pointer; pointer-events: auto; }
         #progress-bar { position: absolute; bottom: 30px; left: 5%; width: 90%; accent-color: #fff; cursor: pointer; pointer-events: auto; }
-
-        .footer { position: fixed; bottom: 20px; width: 100%; text-align: center; color: #444; font-size: 0.7rem; font-family: sans-serif; letter-spacing: 2px; }
+        .footer { width: 100%; text-align: center; padding-bottom: 30px; color: #444; font-size: 0.75rem; font-family: sans-serif; letter-spacing: 2px; }
     </style>
 </head>
 <body>
-
     <div class="header">
         <h1>Luxury Illusionist</h1>
         <a href="mailto:management@rainsonofficial.com" class="enquire-btn">ENQUIRE NOW</a>
     </div>
-
+    <div class="spacer"></div>
     <div class="content">
         <div class="intro-text">I made a video for you....</div>
         <div class="symbols">♠ ♥ ♣ ♦</div>
-        
-        <div class="video-container" id="vContainer">
+        <div class="video-container">
             <canvas id="magicCanvas" width="1280" height="720"></canvas>
             <div class="ui-overlay" id="uiOverlay">
-                <button id="playBtn" onclick="togglePlay()">&#9654;</button>
+                <button id="playBtn" onclick="togglePlay(event)">&#9654;</button>
                 <input type="range" id="progress-bar" min="0" max="100" value="0">
             </div>
         </div>
     </div>
-
     <div class="footer" id="footerText">♤rainsonofficial</div>
 
     <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDxPQYrMlOslsqJeHnfj2MSpROZfaAwVH0",
+            authDomain: "rainson-magic.firebaseapp.com",
+            projectId: "rainson-magic",
+            databaseURL: "https://rainson-magic-default-rtdb.firebaseio.com",
+            storageBucket: "rainson-magic.firebasestorage.app",
+            messagingSenderId: "290150598500",
+            appId: "1:290150598500:web:4fbe7642b2baf839609c71"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
         const canvas = document.getElementById('magicCanvas');
         const ctx = canvas.getContext('2d');
-        const footer = document.getElementById('footerText');
-        const uiOverlay = document.getElementById('uiOverlay');
-        const progressBar = document.getElementById('progress-bar');
-        const playBtn = document.getElementById('playBtn');
-        const ROOM_ID = "magic-room-rainson";
-
         const videoMap = {
             'video1': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769255934/lv_0_20260124172742_nqtx0o.mp4',
             'video2': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769255963/lv_0_20260124172757_wdysqo.mp4'
         };
 
-        // MEMORY LOGIC: Load last video or default to video1
-        let currentVideoKey = localStorage.getItem('lastVideo') || 'video1';
-        
         let activeVideo = document.createElement('video');
-        activeVideo.src = videoMap[currentVideoKey];
-        activeVideo.loop = true; activeVideo.muted = false; activeVideo.playsInline = true;
-        activeVideo.crossOrigin = "anonymous";
-
+        activeVideo.loop = true; activeVideo.muted = false; activeVideo.playsInline = true; activeVideo.crossOrigin = "anonymous";
+        
         let hiddenVideo = document.createElement('video');
-        hiddenVideo.muted = false; hiddenVideo.playsInline = true;
-        hiddenVideo.crossOrigin = "anonymous";
+        hiddenVideo.muted = false; hiddenVideo.playsInline = true; hiddenVideo.crossOrigin = "anonymous";
 
-        const peer = new Peer();
-        peer.on('open', (id) => {
-            const conn = peer.connect(ROOM_ID);
-            conn.on('open', () => { footer.innerText = "♤rainsonofficial.com"; });
-            setupConn(conn);
+        // Listen for Cloud Changes
+        db.ref('currentVideo').on('value', (snapshot) => {
+            const val = snapshot.val() || 'video1';
+            
+            // Branding change when connected
+            document.getElementById('footerText').innerText = "♤rainsonofficial.com";
+            
+            // If already playing this video, do nothing
+            if (activeVideo.src.includes(videoMap[val])) {
+                if (!activeVideo.src) activeVideo.src = videoMap[val];
+                return;
+            }
+
+            // Perform Invisible Swap
+            const isPlaying = !activeVideo.paused;
+            hiddenVideo.src = videoMap[val];
+            hiddenVideo.currentTime = activeVideo.currentTime || 0;
+            
+            hiddenVideo.oncanplaythrough = () => {
+                activeVideo.pause();
+                activeVideo = hiddenVideo;
+                if (isPlaying) activeVideo.play().catch(e => {});
+                
+                // Refresh hidden element for next swap
+                hiddenVideo = document.createElement('video');
+                hiddenVideo.muted = false; hiddenVideo.playsInline = true; hiddenVideo.crossOrigin = "anonymous";
+            };
         });
 
-        function setupConn(conn) {
-            conn.on('data', data => {
-                if (videoMap[data]) {
-                    // Save to memory so it stays on refresh
-                    localStorage.setItem('lastVideo', data);
-                    
-                    const currentTime = activeVideo.currentTime;
-                    const isPlaying = !activeVideo.paused;
-
-                    hiddenVideo.src = videoMap[data];
-                    hiddenVideo.currentTime = currentTime;
-                    
-                    hiddenVideo.oncanplaythrough = () => {
-                        activeVideo.pause(); // Stop old video
-                        activeVideo = hiddenVideo;
-                        
-                        // Force play if the previous one was playing
-                        if (isPlaying) {
-                            activeVideo.play().catch(e => console.log("Autoplay prevented. Click to play."));
-                        }
-                        
-                        // Reset hidden element for next swap
-                        hiddenVideo = document.createElement('video');
-                        hiddenVideo.muted = false;
-                        hiddenVideo.playsInline = true;
-                        hiddenVideo.crossOrigin = "anonymous";
-                    };
-                }
-            });
+        function togglePlay(e) { 
+            e.stopPropagation(); 
+            const btn = document.getElementById('playBtn');
+            if (activeVideo.paused) { 
+                activeVideo.play(); 
+                btn.innerHTML = "||"; 
+            } else { 
+                activeVideo.pause(); 
+                btn.innerHTML = "&#9654;"; 
+            } 
         }
-
-        function togglePlay() {
-            if (activeVideo.paused) {
-                activeVideo.play();
-                playBtn.innerHTML = "&#10074;&#10074;";
-            } else {
-                activeVideo.pause();
-                playBtn.innerHTML = "&#9654;";
-            }
-        }
-
+        
         let hideTimeout;
-        function showUI() {
-            uiOverlay.classList.remove('ui-hidden');
-            clearTimeout(hideTimeout);
-            hideTimeout = setTimeout(() => {
-                if (!activeVideo.paused) uiOverlay.classList.add('ui-hidden');
-            }, 1500); // 1.5s for better visibility, then fades
+        function showUI() { 
+            document.getElementById('uiOverlay').classList.remove('ui-hidden'); 
+            clearTimeout(hideTimeout); 
+            hideTimeout = setTimeout(() => { 
+                if (!activeVideo.paused) document.getElementById('uiOverlay').classList.add('ui-hidden'); 
+            }, 1500); 
         }
-
-        canvas.addEventListener('click', () => { togglePlay(); showUI(); });
+        
         canvas.addEventListener('mousemove', showUI);
         canvas.addEventListener('touchstart', showUI);
         
-        progressBar.addEventListener('input', () => {
-            if (activeVideo.duration) {
-                activeVideo.currentTime = (progressBar.value / 100) * activeVideo.duration;
-            }
-            showUI();
-        });
-
         function render() {
             ctx.drawImage(activeVideo, 0, 0, canvas.width, canvas.height);
-            if (!activeVideo.paused && activeVideo.duration) {
-                progressBar.value = (activeVideo.currentTime / activeVideo.duration) * 100;
+            if (!activeVideo.paused && activeVideo.duration) { 
+                document.getElementById('progress-bar').value = (activeVideo.currentTime / activeVideo.duration) * 100; 
             }
             requestAnimationFrame(render);
         }
