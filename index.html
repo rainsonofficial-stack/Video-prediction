@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>The Gallery</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        body { margin: 0; background: black; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        canvas { max-width: 100%; max-height: 100%; }
+        #id-display { position: fixed; top: 10px; left: 10px; color: rgba(255,255,255,0.3); font-family: monospace; font-size: 12px; z-index: 100; }
+    </style>
+</head>
+<body>
+    <div id="id-display">Initializing...</div>
+    <canvas id="magicCanvas" width="1280" height="720"></canvas>
+
+    <script>
+        const canvas = document.getElementById('magicCanvas');
+        const ctx = canvas.getContext('2d');
+        const idDisplay = document.getElementById('id-display');
+
+        // Mapping signals to your actual Cloudinary URLs
+        const videoMap = {
+            'video1': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769255934/lv_0_20260124172742_nqtx0o.mp4',
+            'video2': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769255963/lv_0_20260124172757_wdysqo.mp4'
+        };
+
+        let activeVideo = document.createElement('video');
+        activeVideo.src = videoMap['video1'];
+        activeVideo.loop = true; activeVideo.muted = true; activeVideo.playsInline = true;
+        activeVideo.crossOrigin = "anonymous"; // Required for Canvas
+        activeVideo.play();
+
+        let hiddenVideo = document.createElement('video');
+        hiddenVideo.muted = true; hiddenVideo.playsInline = true;
+        hiddenVideo.crossOrigin = "anonymous";
+
+        // PeerJS Setup
+        const peer = new Peer();
+        peer.on('open', id => { idDisplay.innerText = "ID: " + id; });
+
+        peer.on('connection', conn => {
+            conn.on('data', data => {
+                // data will be "video1" or "video2" from your remote
+                if (videoMap[data]) {
+                    const nextSrc = videoMap[data];
+                    
+                    // Pre-syncing logic
+                    hiddenVideo.src = nextSrc;
+                    hiddenVideo.currentTime = activeVideo.currentTime;
+                    
+                    hiddenVideo.oncanplaythrough = () => {
+                        if (!activeVideo.paused) hiddenVideo.play();
+                        // Seamlessly swap the reference the canvas is drawing from
+                        activeVideo = hiddenVideo; 
+                        
+                        // Prepare the "other" video element for the next swap
+                        hiddenVideo = document.createElement('video');
+                        hiddenVideo.muted = true;
+                        hiddenVideo.crossOrigin = "anonymous";
+                    };
+                }
+            });
+        });
+
+        // The Canvas Painting Loop
+        function render() {
+            ctx.drawImage(activeVideo, 0, 0, canvas.width, canvas.height);
+            requestAnimationFrame(render);
+        }
+        render();
+
+        // Allow clicking the canvas to "Start" (Browsers often block auto-play)
+        canvas.addEventListener('click', () => activeVideo.play());
+    </script>
+</body>
+</html>
+
