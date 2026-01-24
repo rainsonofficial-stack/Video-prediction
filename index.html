@@ -4,26 +4,41 @@
     <title>The Gallery</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { margin: 0; background: #111; display: flex; justify-content: center; align-items: center; height: 100vh; }
-        .video-container { width: 70%; position: relative; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
-        canvas { width: 100%; display: block; border-radius: 8px; }
-        /* Hidden UI */
+        body { margin: 0; background: #111; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; }
+        .wrapper { width: 70%; display: flex; flex-direction: column; align-items: center; }
+        
+        /* Progress Bar / Cursor */
+        .progress-container { width: 100%; margin-bottom: 10px; }
+        #progress-bar { width: 100%; cursor: pointer; accent-color: #f00; }
+
+        .video-container { width: 100%; position: relative; background: #000; box-shadow: 0 0 50px rgba(0,0,0,0.8); border-radius: 4px; overflow: hidden; }
+        canvas { width: 100%; display: block; }
+        
+        .controls { margin-top: 15px; }
+        #playBtn { background: none; border: 1px solid #444; color: white; padding: 10px 20px; cursor: pointer; font-size: 20px; border-radius: 50%; width: 50px; height: 50px; }
         #status { position: fixed; bottom: 5px; right: 5px; color: #222; font-size: 10px; }
     </style>
 </head>
 <body>
     <div id="status">Connecting...</div>
-    <div class="video-container">
-        <canvas id="magicCanvas" width="1280" height="720"></canvas>
-        <div style="text-align: center; margin-top: 10px;">
-            <button onclick="togglePlay()" style="background:none; border:1px solid #444; color:white; padding:5px 15px; cursor:pointer;">Play/Pause</button>
+    <div class="wrapper">
+        <div class="progress-container">
+            <input type="range" id="progress-bar" min="0" max="100" value="0">
+        </div>
+        <div class="video-container">
+            <canvas id="magicCanvas" width="1280" height="720"></canvas>
+        </div>
+        <div class="controls">
+            <button id="playBtn" onclick="togglePlay()">&#9654;</button>
         </div>
     </div>
 
     <script>
         const canvas = document.getElementById('magicCanvas');
         const ctx = canvas.getContext('2d');
-        const ROOM_ID = "magic-room-rainson"; // HARDCODED ROOM NAME
+        const progressBar = document.getElementById('progress-bar');
+        const playBtn = document.getElementById('playBtn');
+        const ROOM_ID = "magic-room-rainson";
 
         const videoMap = {
             'video1': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769255934/lv_0_20260124172742_nqtx0o.mp4',
@@ -34,22 +49,18 @@
         activeVideo.src = videoMap['video1'];
         activeVideo.loop = true; activeVideo.muted = false; activeVideo.playsInline = true;
         activeVideo.crossOrigin = "anonymous";
-        activeVideo.play();
 
         let hiddenVideo = document.createElement('video');
         hiddenVideo.muted = false; hiddenVideo.playsInline = true;
         hiddenVideo.crossOrigin = "anonymous";
 
-        // Connection Logic
         const peer = new Peer();
         peer.on('open', (id) => {
             document.getElementById('status').innerText = "Ready";
-            // Connect to the room (The remote will find us)
             const conn = peer.connect(ROOM_ID);
             setupConn(conn);
         });
 
-        // If the remote connects to us
         peer.on('connection', setupConn);
 
         function setupConn(conn) {
@@ -68,14 +79,31 @@
         }
 
         function togglePlay() {
-            if (activeVideo.paused) activeVideo.play();
-            else activeVideo.pause();
+            if (activeVideo.paused) {
+                activeVideo.play();
+                playBtn.innerHTML = "&#10074;&#10074;"; // Pause symbol
+            } else {
+                activeVideo.pause();
+                playBtn.innerHTML = "&#9654;"; // Play symbol
+            }
         }
 
         function render() {
             ctx.drawImage(activeVideo, 0, 0, canvas.width, canvas.height);
+            // Update progress bar cursor
+            if (!activeVideo.paused) {
+                const val = (activeVideo.currentTime / activeVideo.duration) * 100;
+                progressBar.value = val || 0;
+            }
             requestAnimationFrame(render);
         }
+
+        // Seek functionality for the cursor
+        progressBar.addEventListener('input', () => {
+            const time = (progressBar.value / 100) * activeVideo.duration;
+            activeVideo.currentTime = time;
+        });
+
         render();
     </script>
 </body>
