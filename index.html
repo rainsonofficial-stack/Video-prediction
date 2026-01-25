@@ -152,11 +152,11 @@
                 </div>
                 <div class="tier-chip gold-tier selected" id="defaultTier" onclick="selectTier('Gold', this)">
                     GOLD
-                    <span>₹1,00,000+ / $5,000+</span>
+                    <span>₹1,0,000+ / $5,000+</span>
                 </div>
                 <div class="tier-chip diamond-tier" onclick="selectTier('Diamond', this)">
                     DIAMOND
-                    <span>₹5,00,000+ / $10,000+</span>
+                    <span>₹5,0,000+ / $10,000+</span>
                 </div>
             </div>
 
@@ -212,13 +212,12 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-                const videoMap = {
+        const videoMap = {
             'video1': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769332080/spade-trial_mwl2cq.mp4',
             'video2': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769332020/hearts-trial_d3tmcx.mp4',
             'video3': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769332130/club-trial_c2nvjk.mp4',
             'video4': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769332050/diamond-trial_r0tg3q.mp4'
         };
-
 
         let active = document.getElementById('playerA');
         let hidden = document.getElementById('playerB');
