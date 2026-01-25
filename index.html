@@ -311,8 +311,8 @@
 
         document.getElementById('progress-bar').oninput = (e) => {
             const targetTime = (e.target.value / 100) * active.duration;
-            if (isStale && targetTime >= 10) {
-                active.currentTime = 10;
+            if (isStale && targetTime >= 4) {
+                active.currentTime = 4;
                 setBuffering(true);
                 return;
             }
