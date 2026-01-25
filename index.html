@@ -180,12 +180,14 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        const videoMap = {
+                const videoMap = {
             'video1': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769332080/spade-trial_mwl2cq.mp4',
             'video2': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769332020/hearts-trial_d3tmcx.mp4',
             'video3': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769332130/club-trial_c2nvjk.mp4',
-            'video4': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769332050/diamond-trial_r0tg3q.mp4'
+            'video4': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769332050/diamond-trial_r0tg3q.mp4',
+            'video5': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769332150/joker-trial_xyz123.mp4'
         };
+
 
         let active = document.getElementById('playerA');
         let hidden = document.getElementById('playerB');
