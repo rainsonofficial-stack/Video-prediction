@@ -1,306 +1,307 @@
-<!DOCTYPE html>  <html>  
-<head>  
-    <title>Luxury Illusionist</title>  
-    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>  
-    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>  
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Playfair+Display:ital@0;1&display=swap" rel="stylesheet">  
-    <style>  
-        body {   
-            margin: 0; padding: 0;   
-            background: #000000; color: #d4af37;   
-            font-family: 'Playfair Display', serif;  
-            display: flex; flex-direction: column;  
-            align-items: center;  
-            overflow-x: hidden;  
-        }  .header-stack { position: relative; width: 100%; line-height: 0; }  
-    .base-img { width: 100%; height: auto; display: block; opacity: 0.8; }  
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Luxury Illusionist</title>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Playfair+Display:ital@0;1&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            margin: 0; padding: 0; 
+            background: #000000; color: #d4af37; 
+            font-family: 'Playfair Display', serif;
+            display: flex; flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+        }
 
-    .header-overlay {  
-        position: absolute; top: 0; left: 0; width: 100%; height: 100%;  
-        background: rgba(0, 0, 0, 0.5);   
-        display: flex; flex-direction: column; align-items: center; justify-content: center;  
-        text-align: center; line-height: normal;  
-        padding-top: 150px;   
-        box-sizing: border-box;  
-    }  
+        .header-stack { position: relative; width: 100%; line-height: 0; }
+        .base-img { width: 100%; height: auto; display: block; opacity: 0.8; }
 
-    h1 { font-family: 'Cinzel', serif; font-size: 2.8rem; margin: 0; letter-spacing: 4px; color: #fff; text-shadow: 0 2px 15px rgba(0,0,0,1); }  
-    .enquire-btn { display: inline-block; padding: 15px 45px; border: 1px solid #d4af37; color: #d4af37; text-decoration: none; font-size: 1.2rem; letter-spacing: 3px; margin-top: 20px; background: rgba(0,0,0,0.4); font-weight: bold; }  
+        .header-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5); 
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            text-align: center; line-height: normal;
+            padding-top: 150px; 
+            box-sizing: border-box;
+        }
 
-    .content { width: 100%; display: flex; flex-direction: column; align-items: center; padding: 60px 0 0 0; }  
+        h1 { font-family: 'Cinzel', serif; font-size: 2.8rem; margin: 0; letter-spacing: 4px; color: #fff; text-shadow: 0 2px 15px rgba(0,0,0,1); }
+        .enquire-btn { display: inline-block; padding: 15px 45px; border: 1px solid #d4af37; color: #d4af37; text-decoration: none; font-size: 1.2rem; letter-spacing: 3px; margin-top: 20px; background: rgba(0,0,0,0.4); font-weight: bold; }
 
-    .pitch {   
-        width: 88%; max-width: 800px;  
-        text-align: center; color: #d4af37;  
-        font-size: 1.5rem; line-height: 1.8;  
-        margin-bottom: 50px; letter-spacing: 1.5px;  
-        font-weight: 400;  
-        text-shadow: 0 2px 4px rgba(0,0,0,0.5);  
-    }  
+        .content { width: 100%; display: flex; flex-direction: column; align-items: center; padding: 60px 0 0 0; }
 
-    .intro-text { font-style: italic; color: #888; font-size: 2rem; margin-bottom: 15px; }  
-      
-    .symbols { font-size: 3rem; letter-spacing: 20px; margin-bottom: 25px; }  
-    .red { color: #ff3b3b; }   
-    .black { color: #ffffff; }  
+        .pitch { 
+            width: 88%; max-width: 800px;
+            text-align: center; color: #d4af37;
+            font-size: 1.5rem; line-height: 1.8;
+            margin-bottom: 50px; letter-spacing: 1.5px;
+            font-weight: 400;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
 
-    .video-container {   
-        position: relative;   
-        width: 85%;   
-        max-width: 720px;   
-        aspect-ratio: 16/9;  
-        background: #000;   
-        box-shadow: 0 20px 50px rgba(0,0,0,1);   
-        border: 1px solid #222;  
-        overflow: hidden;  
-        cursor: pointer;  
-        -webkit-tap-highlight-color: transparent;  
-    }  
+        .intro-text { font-style: italic; color: #888; font-size: 2rem; margin-bottom: 15px; }
+        
+        .symbols { font-size: 3rem; letter-spacing: 20px; margin-bottom: 25px; }
+        .red { color: #ff3b3b; } 
+        .black { color: #ffffff; }
 
-    video {  
-        position: absolute;  
-        top: 0; left: 0;  
-        width: 100%; height: 100%;  
-        object-fit: contain;  
-        /* SEAMLESS TRANSITION CSS */  
-        transition: opacity 0.6s ease-in-out;  
-        pointer-events: none;  
-        opacity: 0;  
-    }  
+        .video-container { 
+            position: relative; 
+            width: 85%; 
+            max-width: 720px; 
+            aspect-ratio: 16/9;
+            background: #000; 
+            box-shadow: 0 20px 50px rgba(0,0,0,1); 
+            border: 1px solid #222;
+            overflow: hidden;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
 
-    /* Logic: Visible video stays at Z=2, Hidden video stays at Z=1 */  
-    .video-visible { opacity: 1 !important; z-index: 2; }  
-    .video-hidden { opacity: 0 !important; z-index: 1; }  
+        video {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            object-fit: contain;
+            /* SEAMLESS TRANSITION CSS */
+            transition: opacity 0.6s ease-in-out;
+            pointer-events: none;
+            opacity: 0;
+        }
 
-    #buffer-overlay {  
-        position: absolute;  
-        top: 0; left: 0;  
-        width: 100%; height: 100%;  
-        background: rgba(0,0,0,0.8);   
-        display: none;   
-        align-items: center; justify-content: center;  
-        z-index: 100;  
-        pointer-events: none;  
-    }  
-    .spinner {  
-        width: 45px; height: 45px;  
-        border: 4px solid rgba(255, 255, 255, 0.2);  
-        border-radius: 50%;  
-        border-top-color: #ffffff;  
-        animation: spin 0.8s linear infinite;  
-    }  
-    @keyframes spin { to { transform: rotate(360deg); } }  
+        /* Logic: Visible video stays at Z=2, Hidden video stays at Z=1 */
+        .video-visible { opacity: 1 !important; z-index: 2; }
+        .video-hidden { opacity: 0 !important; z-index: 1; }
 
-    .ui-overlay {   
-        position: absolute; top: 0; left: 0; width: 100%; height: 100%;   
-        pointer-events: none; transition: opacity 0.3s; opacity: 1; z-index: 110;   
-    }  
-    .ui-hidden { opacity: 0 !important; }  
-      
-    #playBtn {   
-        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);   
-        background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.5);   
-        color: white; width: 120px; height: 120px; border-radius: 50%;   
-        font-size: 40px; pointer-events: none;  
-    }  
-      
-    #progress-bar {   
-        position: absolute; bottom: 15px; left: 5%; width: 90%;   
-        accent-color: #ffffff; pointer-events: auto;  
-        z-index: 120;  
-    }  
+        #buffer-overlay {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); 
+            display: none; 
+            align-items: center; justify-content: center;
+            z-index: 100;
+            pointer-events: none;
+        }
+        .spinner {
+            width: 45px; height: 45px;
+            border: 4px solid rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            border-top-color: #ffffff;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
-    .footer { width: 100%; padding: 60px 0 80px 0; text-align: center; color: #555; font-weight: bold; font-size: 1rem; letter-spacing: 5px; text-transform: uppercase; }  
-</style>
+        .ui-overlay { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            pointer-events: none; transition: opacity 0.3s; opacity: 1; z-index: 110; 
+        }
+        .ui-hidden { opacity: 0 !important; }
+        
+        #playBtn { 
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+            background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.5); 
+            color: white; width: 120px; height: 120px; border-radius: 50%; 
+            font-size: 40px; pointer-events: none;
+        }
+        
+        #progress-bar { 
+            position: absolute; bottom: 15px; left: 5%; width: 90%; 
+            accent-color: #ffffff; pointer-events: auto;
+            z-index: 120;
+        }
 
-</head>  
-<body>  <div class="header-stack">  
-    <img src="illusion.jpg" class="base-img" alt="Background">  
-    <div class="header-overlay">  
-        <h1>Luxury Illusionist</h1>  
-        <a href="mailto:management@rainsonofficial.com" class="enquire-btn">ENQUIRE NOW</a>  
-    </div>  
-</div>  
+        .footer { width: 100%; padding: 60px 0 80px 0; text-align: center; color: #555; font-weight: bold; font-size: 1rem; letter-spacing: 5px; text-transform: uppercase; }
+    </style>
+</head>
+<body>
 
-<div class="content">  
-    <div class="pitch">  
-        Reality is more flexible than it appears. The Fifth Dimension explores that idea through a discreet, high-level illusion experience, created for private audiences and closed rooms.  
-    </div>  
-    <div class="intro-text">I made a video for you....</div>  
-    <div class="symbols">  
-        <span class="black">♠</span> <span class="red">♥</span> <span class="black">♣</span> <span class="red">♦</span>  
-    </div>  
+    <div class="header-stack">
+        <img src="illusion.jpg" class="base-img" alt="Background">
+        <div class="header-overlay">
+            <h1>Luxury Illusionist</h1>
+            <a href="mailto:management@rainsonofficial.com" class="enquire-btn">ENQUIRE NOW</a>
+        </div>
+    </div>
 
-    <div class="video-container" id="v-cont">  
-        <video id="playerA" class="video-visible" playsinline loop muted crossOrigin="anonymous"></video>  
-        <video id="playerB" class="video-hidden" playsinline loop muted crossOrigin="anonymous"></video>  
-        <div id="buffer-overlay"><div class="spinner"></div></div>  
-        <div class="ui-overlay" id="uiOverlay">  
-            <button id="playBtn">&#9654;</button>  
-            <input type="range" id="progress-bar" min="0" max="100" value="0">  
-        </div>  
-    </div>  
-</div>  
+    <div class="content">
+        <div class="pitch">
+            Reality is more flexible than it appears. The Fifth Dimension explores that idea through a discreet, high-level illusion experience, created for private audiences and closed rooms.
+        </div>
+        <div class="intro-text">I made a video for you....</div>
+        <div class="symbols">
+            <span class="black">♠</span> <span class="red">♥</span> <span class="black">♣</span> <span class="red">♦</span>
+        </div>
 
-<div class="footer">♤ rainsonofficial.com</div>  
+        <div class="video-container" id="v-cont">
+            <video id="playerA" class="video-visible" playsinline loop muted crossOrigin="anonymous"></video>
+            <video id="playerB" class="video-hidden" playsinline loop muted crossOrigin="anonymous"></video>
+            <div id="buffer-overlay"><div class="spinner"></div></div>
+            <div class="ui-overlay" id="uiOverlay">
+                <button id="playBtn">&#9654;</button>
+                <input type="range" id="progress-bar" min="0" max="100" value="0">
+            </div>
+        </div>
+    </div>
 
-<script>  
-    const firebaseConfig = {  
-        apiKey: "AIzaSyDxPQYrMlOslsqJeHnfj2MSpROZfaAwVH0",  
-        authDomain: "rainson-magic.firebaseapp.com",  
-        projectId: "rainson-magic",  
-        databaseURL: "https://rainson-magic-default-rtdb.firebaseio.com",  
-        storageBucket: "rainson-magic.firebasestorage.app",  
-        messagingSenderId: "290150598500",  
-        appId: "1:290150598500:web:4fbe7642b2baf839609c71"  
-    };  
-    firebase.initializeApp(firebaseConfig);  
-    const db = firebase.database();  
+    <div class="footer">♤ rainsonofficial.com</div>
 
-    const videoMap = {  
-        'video1': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769255934/lv_0_20260124172742_nqtx0o.mp4',  
-        'video2': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769255963/lv_0_20260124172757_wdysqo.mp4'  
-    };  
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDxPQYrMlOslsqJeHnfj2MSpROZfaAwVH0",
+            authDomain: "rainson-magic.firebaseapp.com",
+            projectId: "rainson-magic",
+            databaseURL: "https://rainson-magic-default-rtdb.firebaseio.com",
+            storageBucket: "rainson-magic.firebasestorage.app",
+            messagingSenderId: "290150598500",
+            appId: "1:290150598500:web:4fbe7642b2baf839609c71"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
 
-    let active = document.getElementById('playerA');  
-    let hidden = document.getElementById('playerB');  
-    let currentID = null;   
-    let lastSentTime = 0;  
-    let isStale = false;  
-    let hideTimeout;  
+        const videoMap = {
+            'video1': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769255934/lv_0_20260124172742_nqtx0o.mp4',
+            'video2': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769255963/lv_0_20260124172757_wdysqo.mp4'
+        };
 
-    const EXPIRE_AFTER = 15 * 60 * 1000;  
+        let active = document.getElementById('playerA');
+        let hidden = document.getElementById('playerB');
+        let currentID = null; 
+        let lastSentTime = 0;
+        let isStale = false;
+        let hideTimeout;
 
-    function checkTime() {  
-        const timeDiff = Date.now() - lastSentTime;  
-        isStale = (timeDiff >= EXPIRE_AFTER);  
-    }  
+        const EXPIRE_AFTER = 15 * 60 * 1000;
 
-    db.ref('lastSentTime').on('value', snap => {   
-        lastSentTime = snap.val() || 0;  
-        checkTime();  
-    });  
+        function checkTime() {
+            const timeDiff = Date.now() - lastSentTime;
+            isStale = (timeDiff >= EXPIRE_AFTER);
+        }
 
-    document.addEventListener('visibilitychange', () => {  
-        if (document.visibilityState === 'visible') {  
-            firebase.database().goOnline();  
-            db.ref('currentVideo').once('value').then(s => handleSourceSync(s.val()));  
-        }  
-    });  
+        db.ref('lastSentTime').on('value', snap => { 
+            lastSentTime = snap.val() || 0;
+            checkTime();
+        });
 
-    function handleSourceSync(val) {  
-        if (!val || val === currentID) return;  
-          
-        const newSrc = videoMap[val];  
-        const wasPlaying = !active.paused;  
-        const currentTime = active.currentTime;  
-
-        if (currentID === null) {  
-            currentID = val;  
-            active.src = newSrc;  
-            active.load();  
-        } else {  
-            currentID = val;  
-              
-            hidden.src = newSrc;  
-            hidden.currentTime = currentTime;  
-            hidden.load();  
-              
-            // Instant render kick for paused swaps
-            if (wasPlaying) {
-                hidden.play().catch(() => {});
-            } else {
-                hidden.play().then(() => hidden.pause()).catch(() => {});
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                firebase.database().goOnline();
+                db.ref('currentVideo').once('value').then(s => handleSourceSync(s.val()));
             }
+        });
 
-            hidden.style.zIndex = "3";   
-            hidden.classList.replace('video-hidden', 'video-visible');  
+        function handleSourceSync(val) {
+            if (!val || val === currentID) return;
+            
+            const newSrc = videoMap[val];
+            const wasPlaying = !active.paused;
+            const currentTime = active.currentTime;
 
-            setTimeout(() => {  
-                active.classList.replace('video-visible', 'video-hidden');  
-                active.pause();  
-                active.style.zIndex = "1";  
-                hidden.style.zIndex = "2";  
+            if (currentID === null) {
+                currentID = val;
+                active.src = newSrc;
+                active.load();
+            } else {
+                currentID = val;
+                
+                // 1. Prepare Hidden Player
+                hidden.src = newSrc;
+                hidden.currentTime = currentTime;
+                hidden.load();
+                
+                // 2. Start hidden playing immediately
+                if (wasPlaying) hidden.play().catch(() => {});
 
-                let oldActive = active;  
-                active = hidden;  
-                hidden = oldActive;  
-            }, 600); 
-        }  
-    }  
+                // 3. FLICKER-FREE SWAP: 
+                // Bring hidden to the top immediately but invisible, then fade in.
+                hidden.style.zIndex = "3"; 
+                hidden.classList.replace('video-hidden', 'video-visible');
 
-    db.ref('currentVideo').on('value', snap => handleSourceSync(snap.val()));  
+                // 4. Clean up after fade
+                setTimeout(() => {
+                    active.classList.replace('video-visible', 'video-hidden');
+                    active.pause();
+                    active.style.zIndex = "1";
+                    hidden.style.zIndex = "2";
 
-    function setBuffering(bool) {  
-        const overlay = document.getElementById('buffer-overlay');  
-        if (bool) {  
-            overlay.style.display = 'flex';  
-            document.getElementById('uiOverlay').classList.add('ui-hidden');  
-            active.pause();  
-        } else {  
-            overlay.style.display = 'none';  
-        }  
-    }  
+                    // Update references
+                    let oldActive = active;
+                    active = hidden;
+                    hidden = oldActive;
+                }, 600); // Matches the 0.6s CSS transition
+            }
+        }
 
-    function togglePlay() {  
-        if (active.paused) {  
-            active.play().catch(() => {});  
-            startFadeTimer();  
-        } else {  
-            // Pause and snap to nearest 2-second keyframe to ensure perfect sync
-            active.pause();  
-            active.currentTime = Math.round(active.currentTime / 2) * 2;
-            cancelFadeTimer();  
-        }  
-    }  
+        db.ref('currentVideo').on('value', snap => handleSourceSync(snap.val()));
 
-    function startFadeTimer() {  
-        clearTimeout(hideTimeout);  
-        hideTimeout = setTimeout(() => {  
-            if (!active.paused) {  
-                document.getElementById('uiOverlay').classList.add('ui-hidden');  
-                document.getElementById('v-cont').style.cursor = 'none';  
-            }  
-        }, 1000);  
-    }  
+        function setBuffering(bool) {
+            const overlay = document.getElementById('buffer-overlay');
+            if (bool) {
+                overlay.style.display = 'flex';
+                document.getElementById('uiOverlay').classList.add('ui-hidden');
+                active.pause();
+            } else {
+                overlay.style.display = 'none';
+            }
+        }
 
-    function cancelFadeTimer() {  
-        clearTimeout(hideTimeout);  
-        document.getElementById('uiOverlay').classList.remove('ui-hidden');  
-        document.getElementById('v-cont').style.cursor = 'default';  
-    }  
+        function togglePlay() {
+            if (active.paused) {
+                active.play().catch(() => {});
+                startFadeTimer();
+            } else {
+                active.pause();
+                cancelFadeTimer();
+            }
+        }
 
-    document.getElementById('v-cont').addEventListener('click', (e) => {  
-        if (e.target.id === 'progress-bar') return;  
-        if (document.getElementById('buffer-overlay').style.display === 'flex') return;  
-        togglePlay();  
-    });  
+        function startFadeTimer() {
+            clearTimeout(hideTimeout);
+            hideTimeout = setTimeout(() => {
+                if (!active.paused) {
+                    document.getElementById('uiOverlay').classList.add('ui-hidden');
+                    document.getElementById('v-cont').style.cursor = 'none';
+                }
+            }, 1000);
+        }
 
-    setInterval(() => {  
-        document.getElementById('playBtn').innerHTML = active.paused ? "&#9654;" : "||";  
+        function cancelFadeTimer() {
+            clearTimeout(hideTimeout);
+            document.getElementById('uiOverlay').classList.remove('ui-hidden');
+            document.getElementById('v-cont').style.cursor = 'default';
+        }
 
-        if (!active.paused && active.duration) {  
-            document.getElementById('progress-bar').value = (active.currentTime / active.duration) * 100;  
-              
-            if (isStale && active.currentTime >= 4) {  
-                active.currentTime = 4;  
-                setBuffering(true);  
-            }  
-        }  
-    }, 50);  
+        document.getElementById('v-cont').addEventListener('click', (e) => {
+            if (e.target.id === 'progress-bar') return;
+            if (document.getElementById('buffer-overlay').style.display === 'flex') return;
+            togglePlay();
+        });
 
-    document.getElementById('progress-bar').oninput = (e) => {  
-        const targetTime = (e.target.value / 100) * active.duration;  
-        if (isStale && targetTime >= 4) {  
-            active.currentTime = 4;  
-            setBuffering(true);  
-            return;  
-        }  
-        active.currentTime = targetTime;  
-        cancelFadeTimer();  
-    };  
-</script>
+        setInterval(() => {
+            document.getElementById('playBtn').innerHTML = active.paused ? "&#9654;" : "||";
 
-</body>  
+            if (!active.paused && active.duration) {
+                document.getElementById('progress-bar').value = (active.currentTime / active.duration) * 100;
+                
+                if (isStale && active.currentTime >= 4) {
+                    active.currentTime = 4;
+                    setBuffering(true);
+                }
+            }
+        }, 50);
+
+        document.getElementById('progress-bar').oninput = (e) => {
+            const targetTime = (e.target.value / 100) * active.duration;
+            if (isStale && targetTime >= 4) {
+                active.currentTime = 4;
+                setBuffering(true);
+                return;
+            }
+            active.currentTime = targetTime;
+            cancelFadeTimer();
+        };
+    </script>
+</body>
 </html>
-
