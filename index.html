@@ -65,7 +65,7 @@
             top: 0; left: 0;
             width: 100%; height: 100%;
             object-fit: contain;
-            transition: opacity 0.5s ease-in-out;
+            transition: opacity 0.5s ease;
             pointer-events: none;
         }
 
@@ -163,10 +163,8 @@
             'video2': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769255963/lv_0_20260124172757_wdysqo.mp4'
         };
 
-        let vA = document.getElementById('playerA');
-        let vB = document.getElementById('playerB');
-        let active = vA;
-        let hidden = vB;
+        let active = document.getElementById('playerA');
+        let hidden = document.getElementById('playerB');
         let currentID = null; 
         let lastSentTime = 0;
         let isStale = false;
@@ -184,6 +182,7 @@
             checkTime();
         });
 
+        // RECOVERY
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
                 firebase.database().goOnline();
@@ -195,42 +194,41 @@
             if (!val || val === currentID) return;
             
             const newSrc = videoMap[val];
+            const wasPlaying = !active.paused;
+            const currentTime = active.currentTime;
+
             if (currentID === null) {
                 currentID = val;
                 active.src = newSrc;
                 active.load();
             } else {
                 currentID = val;
+                
+                // 1. Prepare Hidden Player
                 hidden.src = newSrc;
+                hidden.currentTime = currentTime;
                 hidden.load();
                 
-                const currentTime = active.currentTime;
-                const wasPlaying = !active.paused;
-                
-                hidden.oncanplaythrough = () => {
-                    hidden.currentTime = currentTime; 
-                    if (wasPlaying) hidden.play();
-                    swapPlayers();
-                    hidden.oncanplaythrough = null;
-                };
+                // 2. Immediate Start Playing (in background)
+                if (wasPlaying) hidden.play().catch(() => {});
+
+                // 3. Visual Swap (Crossfade)
+                hidden.classList.replace('video-hidden', 'video-visible');
+                active.classList.replace('video-visible', 'video-hidden');
+
+                // 4. THE CRITICAL FIX: Re-assign variables immediately
+                let oldActive = active;
+                active = hidden;
+                hidden = oldActive;
+
+                // 5. Clean up old player after fade
+                setTimeout(() => {
+                    hidden.pause();
+                }, 600);
             }
         }
 
         db.ref('currentVideo').on('value', snap => handleSourceSync(snap.val()));
-
-        function swapPlayers() {
-            // Simultaneous class swap for crossfade
-            hidden.classList.replace('video-hidden', 'video-visible');
-            active.classList.replace('video-visible', 'video-hidden');
-            
-            // Swap reference after fade
-            setTimeout(() => {
-                active.pause();
-                let temp = active; 
-                active = hidden; 
-                hidden = temp;
-            }, 500);
-        }
 
         function setBuffering(bool) {
             const overlay = document.getElementById('buffer-overlay');
@@ -281,7 +279,6 @@
             if (!active.paused && active.duration) {
                 document.getElementById('progress-bar').value = (active.currentTime / active.duration) * 100;
                 
-                // STRICT 4s LOCK
                 if (isStale && active.currentTime >= 4) {
                     active.currentTime = 4;
                     setBuffering(true);
@@ -302,4 +299,3 @@
     </script>
 </body>
 </html>
-
