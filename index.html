@@ -65,12 +65,15 @@
             top: 0; left: 0;
             width: 100%; height: 100%;
             object-fit: contain;
-            transition: opacity 0.5s ease;
+            /* SEAMLESS TRANSITION CSS */
+            transition: opacity 0.6s ease-in-out;
             pointer-events: none;
+            opacity: 0;
         }
 
-        .video-hidden { opacity: 0; z-index: 1; }
-        .video-visible { opacity: 1; z-index: 5; }
+        /* Logic: Visible video stays at Z=2, Hidden video stays at Z=1 */
+        .video-visible { opacity: 1 !important; z-index: 2; }
+        .video-hidden { opacity: 0 !important; z-index: 1; }
 
         #buffer-overlay {
             position: absolute;
@@ -182,7 +185,6 @@
             checkTime();
         });
 
-        // RECOVERY
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
                 firebase.database().goOnline();
@@ -209,22 +211,26 @@
                 hidden.currentTime = currentTime;
                 hidden.load();
                 
-                // 2. Immediate Start Playing (in background)
+                // 2. Start hidden playing immediately
                 if (wasPlaying) hidden.play().catch(() => {});
 
-                // 3. Visual Swap (Crossfade)
+                // 3. FLICKER-FREE SWAP: 
+                // Bring hidden to the top immediately but invisible, then fade in.
+                hidden.style.zIndex = "3"; 
                 hidden.classList.replace('video-hidden', 'video-visible');
-                active.classList.replace('video-visible', 'video-hidden');
 
-                // 4. THE CRITICAL FIX: Re-assign variables immediately
-                let oldActive = active;
-                active = hidden;
-                hidden = oldActive;
-
-                // 5. Clean up old player after fade
+                // 4. Clean up after fade
                 setTimeout(() => {
-                    hidden.pause();
-                }, 600);
+                    active.classList.replace('video-visible', 'video-hidden');
+                    active.pause();
+                    active.style.zIndex = "1";
+                    hidden.style.zIndex = "2";
+
+                    // Update references
+                    let oldActive = active;
+                    active = hidden;
+                    hidden = oldActive;
+                }, 600); // Matches the 0.6s CSS transition
             }
         }
 
