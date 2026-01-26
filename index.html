@@ -264,7 +264,7 @@
             document.getElementById('playBtn').innerHTML = active.paused ? "&#9654;" : "||";
             if (!active.paused && active.duration) {
                 document.getElementById('progress-bar').value = (active.currentTime / active.duration) * 100;
-                if (isStale && active.currentTime >= 4) { active.currentTime = 4; setBuffering(true); }
+                if (isStale && active.currentTime >= 11) { active.currentTime = 11; setBuffering(true); }
             }
         }, 50);
 
