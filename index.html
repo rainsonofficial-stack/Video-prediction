@@ -121,10 +121,10 @@
             z-index: 120;
         }
 
-        /* NEW: Permanent Time Counter style */
+        /* Time Counter Style: 2x Bigger, Default Font, Position Right */
         #v-timer {
-            position: absolute; bottom: 42px; left: 5%;
-            color: #ffffff; font-family: 'Cinzel', serif; font-size: 0.8rem;
+            position: absolute; bottom: 42px; right: 5%;
+            color: #ffffff; font-family: 'Playfair Display', serif; font-size: 1.6rem;
             z-index: 150; pointer-events: none; text-shadow: 0 0 5px rgba(0,0,0,1);
         }
 
@@ -141,7 +141,7 @@
             <div class="tier-container">
                 <div class="tier-chip silver-tier" onclick="selectTier('Silver', this)">SILVER<span>₹50,000+ / $2,000+</span></div>
                 <div class="tier-chip gold-tier selected" id="defaultTier" onclick="selectTier('Gold', this)">GOLD<span>₹1,00,000+ / $5,000+</span></div>
-                <div class="tier-chip diamond-tier" onclick="selectTier('Diamond', this)">DIAMOND<span>₹5,00,000+ / $10,000+</span></div>
+                <div class="tier-chip diamond-tier" onclick="selectTier('Diamond', this)">DIAMOND<span>₹5,0,0,000+ / $10,000+</span></div>
             </div>
             <a href="mailto:management@rainsonofficial.com?subject=Magic Enquiry Gold" id="enqBtn" class="enquire-btn">ENQUIRE NOW</a>
         </div>
@@ -268,7 +268,7 @@
             document.getElementById('playBtn').innerHTML = active.paused ? "&#9654;" : "||";
             if (!active.paused && active.duration) {
                 document.getElementById('progress-bar').value = (active.currentTime / active.duration) * 100;
-                // Update permanent timer feature
+                
                 const mins = Math.floor(active.currentTime / 60);
                 const secs = Math.floor(active.currentTime % 60);
                 document.getElementById('v-timer').innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
