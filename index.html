@@ -121,7 +121,6 @@
             z-index: 120;
         }
 
-        /* Time Counter Style */
         #v-timer {
             position: absolute; bottom: 42px; right: 5%;
             color: #ffffff; font-family: 'Roboto', sans-serif; font-size: 1.6rem;
@@ -129,7 +128,6 @@
         }
 
         .footer { width: 100%; padding: 60px 0 80px 0; text-align: center; color: #555; font-weight: bold; font-size: 1rem; letter-spacing: 5px; text-transform: uppercase; }
-        /* Dot style */
         #discreet-dot { opacity: 0; transition: opacity 0.2s; }
     </style>
 </head>
@@ -206,29 +204,25 @@
         function checkTime() { const timeDiff = Date.now() - lastSentTime; isStale = (timeDiff >= EXPIRE_AFTER); }
         db.ref('lastSentTime').on('value', snap => { lastSentTime = snap.val() || 0; checkTime(); });
 
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') {
-                firebase.database().goOnline();
-                db.ref('currentVideo').once('value').then(s => handleSourceSync(s.val()));
-            }
-        });
-
         function handleSourceSync(val) {
             if (!val || val === currentID) return;
             
+            // Release buffer lock immediately
+            setBuffering(false);
+
             const dot = document.getElementById('discreet-dot');
             dot.style.opacity = "1";
             clearTimeout(dotTimeout);
             dotTimeout = setTimeout(() => { dot.style.opacity = "0"; }, 15000);
 
             const newSrc = videoMap[val];
-            const wasPlaying = !active.paused;
             const currentTime = active.currentTime;
 
             if (currentID === null) {
                 currentID = val;
                 active.src = newSrc;
                 active.load();
+                active.play().catch(() => {}); // Auto-resume on fresh load
             } else {
                 currentID = val;
                 hidden.src = newSrc;
@@ -236,9 +230,8 @@
                 hidden.load();
                 hidden.onloadeddata = () => {
                     hidden.currentTime = active.currentTime;
-                    if (wasPlaying) {
-                        hidden.play().then(() => performCut()).catch(() => performCut());
-                    } else { performCut(); }
+                    // Force play to resume even if previous state was paused by stale buffer
+                    hidden.play().then(() => performCut()).catch(() => performCut());
                     hidden.onloadeddata = null;
                 };
             }
@@ -269,7 +262,6 @@
             document.getElementById('playBtn').innerHTML = active.paused ? "&#9654;" : "||";
             if (!active.paused && active.duration) {
                 document.getElementById('progress-bar').value = (active.currentTime / active.duration) * 100;
-                
                 const mins = Math.floor(active.currentTime / 60);
                 const secs = Math.floor(active.currentTime % 60);
                 document.getElementById('v-timer').innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
@@ -282,12 +274,9 @@
             const targetTime = (e.target.value / 100) * active.duration;
             if (isStale && targetTime >= 12) { active.currentTime = 12; setBuffering(true); return; }
             active.currentTime = targetTime;
-            
-            // NEW: Update timer while scrubbing (during pause)
             const mins = Math.floor(active.currentTime / 60);
             const secs = Math.floor(active.currentTime % 60);
             document.getElementById('v-timer').innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-            
             cancelFadeTimer();
         };
     </script>
