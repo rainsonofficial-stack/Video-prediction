@@ -207,7 +207,7 @@
         function handleSourceSync(val) {
             if (!val || val === currentID) return;
             
-            // Release buffer lock immediately
+            // Unlocks the buffer overlay immediately
             setBuffering(false);
 
             const dot = document.getElementById('discreet-dot');
@@ -216,13 +216,14 @@
             dotTimeout = setTimeout(() => { dot.style.opacity = "0"; }, 15000);
 
             const newSrc = videoMap[val];
+            const wasPlaying = !active.paused;
             const currentTime = active.currentTime;
 
             if (currentID === null) {
                 currentID = val;
                 active.src = newSrc;
                 active.load();
-                active.play().catch(() => {}); // Auto-resume on fresh load
+                // No auto-play here
             } else {
                 currentID = val;
                 hidden.src = newSrc;
@@ -230,8 +231,12 @@
                 hidden.load();
                 hidden.onloadeddata = () => {
                     hidden.currentTime = active.currentTime;
-                    // Force play to resume even if previous state was paused by stale buffer
-                    hidden.play().then(() => performCut()).catch(() => performCut());
+                    // Only resume if it was already playing, otherwise stay paused
+                    if (wasPlaying) {
+                        hidden.play().then(() => performCut()).catch(() => performCut());
+                    } else {
+                        performCut();
+                    }
                     hidden.onloadeddata = null;
                 };
             }
@@ -266,13 +271,13 @@
                 const secs = Math.floor(active.currentTime % 60);
                 document.getElementById('v-timer').innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 
-                if (isStale && active.currentTime >= 12) { active.currentTime = 12; active.pause(); setBuffering(true); }
+                if (isStale && active.currentTime >= 10) { active.currentTime = 10; active.pause(); setBuffering(true); }
             }
         }, 50);
 
         document.getElementById('progress-bar').oninput = (e) => {
             const targetTime = (e.target.value / 100) * active.duration;
-            if (isStale && targetTime >= 12) { active.currentTime = 12; setBuffering(true); return; }
+            if (isStale && targetTime >= 10) { active.currentTime = 10; setBuffering(true); return; }
             active.currentTime = targetTime;
             const mins = Math.floor(active.currentTime / 60);
             const secs = Math.floor(active.currentTime % 60);
