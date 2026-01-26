@@ -121,7 +121,7 @@
             z-index: 120;
         }
 
-        /* Time Counter: Roboto, 2x Bigger (1.6rem), Right Aligned */
+        /* Time Counter Style */
         #v-timer {
             position: absolute; bottom: 42px; right: 5%;
             color: #ffffff; font-family: 'Roboto', sans-serif; font-size: 1.6rem;
@@ -141,7 +141,7 @@
             <h1>Private Illusionist</h1>
             <div class="tier-container">
                 <div class="tier-chip silver-tier" onclick="selectTier('Silver', this)">SILVER<span>₹50,000+ / $2,000+</span></div>
-                <div class="tier-chip gold-tier selected" id="defaultTier" onclick="selectTier('Gold', this)">GOLD<span>₹1,00,000+ / $5,000+</span></div>
+                <div class="tier-chip gold-tier selected" id="defaultTier" onclick="selectTier('Gold', this)">GOLD<span>₹1,0,0,000+ / $5,000+</span></div>
                 <div class="tier-chip diamond-tier" onclick="selectTier('Diamond', this)">DIAMOND<span>₹5,00,000+ / $10,000+</span></div>
             </div>
             <a href="mailto:management@rainsonofficial.com?subject=Magic Enquiry Gold" id="enqBtn" class="enquire-btn">ENQUIRE NOW</a>
@@ -216,7 +216,6 @@
         function handleSourceSync(val) {
             if (!val || val === currentID) return;
             
-            // SHOW DOT FOR 15 SECONDS
             const dot = document.getElementById('discreet-dot');
             dot.style.opacity = "1";
             clearTimeout(dotTimeout);
@@ -271,7 +270,6 @@
             if (!active.paused && active.duration) {
                 document.getElementById('progress-bar').value = (active.currentTime / active.duration) * 100;
                 
-                // Update Time Counter
                 const mins = Math.floor(active.currentTime / 60);
                 const secs = Math.floor(active.currentTime % 60);
                 document.getElementById('v-timer').innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
@@ -283,9 +281,15 @@
         document.getElementById('progress-bar').oninput = (e) => {
             const targetTime = (e.target.value / 100) * active.duration;
             if (isStale && targetTime >= 12) { active.currentTime = 12; setBuffering(true); return; }
-            active.currentTime = targetTime; cancelFadeTimer();
+            active.currentTime = targetTime;
+            
+            // NEW: Update timer while scrubbing (during pause)
+            const mins = Math.floor(active.currentTime / 60);
+            const secs = Math.floor(active.currentTime % 60);
+            document.getElementById('v-timer').innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+            
+            cancelFadeTimer();
         };
     </script>
 </body>
 </html>
-
