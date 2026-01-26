@@ -4,7 +4,7 @@
     <title>Private Illusionist</title>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Playfair+Display:ital@0;1&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Playfair+Display:ital@0;1&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body { 
             margin: 0; padding: 0; 
@@ -121,14 +121,15 @@
             z-index: 120;
         }
 
-        /* Time Counter Style: 2x Bigger, Default Font, Position Right */
+        /* Time Counter: Roboto, 2x Bigger (1.6rem), Right Aligned */
         #v-timer {
             position: absolute; bottom: 42px; right: 5%;
-            color: #ffffff; font-family: 'Playfair Display', serif; font-size: 1.6rem;
+            color: #ffffff; font-family: 'Roboto', sans-serif; font-size: 1.6rem;
             z-index: 150; pointer-events: none; text-shadow: 0 0 5px rgba(0,0,0,1);
         }
 
         .footer { width: 100%; padding: 60px 0 80px 0; text-align: center; color: #555; font-weight: bold; font-size: 1rem; letter-spacing: 5px; text-transform: uppercase; }
+        /* Dot style */
         #discreet-dot { opacity: 0; transition: opacity 0.2s; }
     </style>
 </head>
@@ -141,7 +142,7 @@
             <div class="tier-container">
                 <div class="tier-chip silver-tier" onclick="selectTier('Silver', this)">SILVER<span>₹50,000+ / $2,000+</span></div>
                 <div class="tier-chip gold-tier selected" id="defaultTier" onclick="selectTier('Gold', this)">GOLD<span>₹1,00,000+ / $5,000+</span></div>
-                <div class="tier-chip diamond-tier" onclick="selectTier('Diamond', this)">DIAMOND<span>₹5,0,0,000+ / $10,000+</span></div>
+                <div class="tier-chip diamond-tier" onclick="selectTier('Diamond', this)">DIAMOND<span>₹5,00,000+ / $10,000+</span></div>
             </div>
             <a href="mailto:management@rainsonofficial.com?subject=Magic Enquiry Gold" id="enqBtn" class="enquire-btn">ENQUIRE NOW</a>
         </div>
@@ -215,6 +216,7 @@
         function handleSourceSync(val) {
             if (!val || val === currentID) return;
             
+            // SHOW DOT FOR 15 SECONDS
             const dot = document.getElementById('discreet-dot');
             dot.style.opacity = "1";
             clearTimeout(dotTimeout);
@@ -269,6 +271,7 @@
             if (!active.paused && active.duration) {
                 document.getElementById('progress-bar').value = (active.currentTime / active.duration) * 100;
                 
+                // Update Time Counter
                 const mins = Math.floor(active.currentTime / 60);
                 const secs = Math.floor(active.currentTime % 60);
                 document.getElementById('v-timer').innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
