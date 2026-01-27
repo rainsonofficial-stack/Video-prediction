@@ -129,13 +129,6 @@
 
         .footer { width: 100%; padding: 60px 0 80px 0; text-align: center; color: #555; font-weight: bold; font-size: 1rem; letter-spacing: 5px; text-transform: uppercase; }
         #discreet-dot { opacity: 0; transition: opacity 0.2s; }
-
-        /* Audio Icon Style */
-        #audio-status {
-            position: absolute; top: 20px; right: 20px;
-            font-size: 24px; color: rgba(255,255,255,0.8);
-            z-index: 160; pointer-events: none; transition: opacity 0.3s;
-        }
     </style>
 </head>
 <body>
@@ -163,7 +156,6 @@
             <video id="playerA" class="video-visible" playsinline loop muted crossOrigin="anonymous"></video>
             <video id="playerB" class="video-hidden" playsinline loop muted crossOrigin="anonymous"></video>
             <div id="v-timer">0:00</div>
-            <div id="audio-status" class="ui-overlay">🔊</div>
             <div id="buffer-overlay"><div class="spinner"></div></div>
             <div class="ui-overlay" id="uiOverlay">
                 <button id="playBtn">&#9654;</button>
@@ -252,7 +244,6 @@
         let isStale = false;
         let hideTimeout;
         let dotTimeout;
-        let lastTap = 0;
 
         const EXPIRE_AFTER = 15 * 60 * 1000;
         function checkTime() { const timeDiff = Date.now() - lastSentTime; isStale = (timeDiff >= EXPIRE_AFTER); }
@@ -310,33 +301,13 @@
 
         function setBuffering(bool) {
             const overlay = document.getElementById('buffer-overlay');
-            if (bool) { overlay.style.display = 'flex'; document.getElementById('uiOverlay').classList.add('ui-hidden'); document.getElementById('audio-status').classList.add('ui-hidden'); active.pause(); bgAudio.pause(); } 
+            if (bool) { overlay.style.display = 'flex'; document.getElementById('uiOverlay').classList.add('ui-hidden'); active.pause(); bgAudio.pause(); } 
             else { overlay.style.display = 'none'; }
         }
         function togglePlay() { if (active.paused) { active.play().catch(() => {}); startFadeTimer(); } else { active.pause(); bgAudio.pause(); cancelFadeTimer(); } }
-        function startFadeTimer() { clearTimeout(hideTimeout); hideTimeout = setTimeout(() => { if (!active.paused) { document.getElementById('uiOverlay').classList.add('ui-hidden'); document.getElementById('audio-status').classList.add('ui-hidden'); document.getElementById('v-cont').style.cursor = 'none'; } }, 1000); }
-        function cancelFadeTimer() { clearTimeout(hideTimeout); document.getElementById('uiOverlay').classList.remove('ui-hidden'); document.getElementById('audio-status').classList.remove('ui-hidden'); document.getElementById('v-cont').style.cursor = 'default'; }
-        
-        document.getElementById('v-cont').addEventListener('click', (e) => { 
-            if (e.target.id === 'progress-bar') return; 
-            if (document.getElementById('buffer-overlay').style.display === 'flex') return; 
-            
-            const now = Date.now();
-            const rect = document.getElementById('v-cont').getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-
-            // Double tap check (within 300ms) for bottom left corner (bottom 25%, left 25%)
-            if (now - lastTap < 300 && x < rect.width * 0.25 && y > rect.height * 0.75) {
-                bgAudio.muted = !bgAudio.muted;
-                document.getElementById('audio-status').innerText = bgAudio.muted ? "🔇" : "🔊";
-                cancelFadeTimer(); 
-                startFadeTimer();
-                return;
-            }
-            lastTap = now;
-            togglePlay(); 
-        });
+        function startFadeTimer() { clearTimeout(hideTimeout); hideTimeout = setTimeout(() => { if (!active.paused) { document.getElementById('uiOverlay').classList.add('ui-hidden'); document.getElementById('v-cont').style.cursor = 'none'; } }, 1000); }
+        function cancelFadeTimer() { clearTimeout(hideTimeout); document.getElementById('uiOverlay').classList.remove('ui-hidden'); document.getElementById('v-cont').style.cursor = 'default'; }
+        document.getElementById('v-cont').addEventListener('click', (e) => { if (e.target.id === 'progress-bar') return; if (document.getElementById('buffer-overlay').style.display === 'flex') return; togglePlay(); });
         
         setInterval(() => {
             document.getElementById('playBtn').innerHTML = active.paused ? "&#9654;" : "||";
@@ -385,4 +356,3 @@ document.onkeydown = function(e) {
     </script>
 </body>
 </html>
-
