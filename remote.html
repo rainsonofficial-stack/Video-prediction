@@ -2,10 +2,9 @@
 <html>
 <head>
     <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#000000">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Remote</title>
+    <meta name="theme-color" content="#000000">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Remote</title>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
     <style>
@@ -86,14 +85,9 @@
         let swipePath = [];
         let holdTimer;
 
-        // Fetch last value on load & keep it updated
         db.ref('currentVideo').on('value', (snapshot) => {
             const cloudVal = snapshot.val();
-            if (cloudVal) {
-                lastSentValue = cloudVal.replace("video", "");
-            } else {
-                lastSentValue = "_";
-            }
+            lastSentValue = cloudVal ? cloudVal.toString().replace("video", "") : "_";
             updateDisplays();
         });
 
@@ -130,16 +124,10 @@
 
         function sendData() {
             if (currentInput === "") return;
-            
-            // 1. SEND TO CLOUD
-            db.ref('currentVideo').set("video" + currentInput);
+            db.ref('currentVideo').set(currentInput); // Removed "video" prefix
             db.ref('lastSentTime').set(Date.now());
-            
-            // 2. WIPE CURRENT INPUT IMMEDIATELY
             currentInput = ""; 
             swipePath = [];
-            
-            // 3. REFRESH VISUALS
             vibrate(400);
             updateDisplays(); 
         }
@@ -150,7 +138,7 @@
         gScreen.addEventListener('touchstart', e => {
             startX = e.touches[0].clientX;
             startY = e.touches[0].clientY;
-            holdTimer = setTimeout(sendData, 2000); // Trigger send on 2s hold
+            holdTimer = setTimeout(sendData, 2000);
         });
 
         gScreen.addEventListener('touchend', e => {
@@ -188,10 +176,12 @@
             p.style.display = (p.style.display === 'flex') ? 'none' : 'flex';
             vibrate(30);
         });
+
         if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js')
-    .then(() => console.log("Service Worker Registered"));
-}
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
+            });
+        }
     </script>
 </body>
 </html>
