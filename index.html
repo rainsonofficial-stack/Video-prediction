@@ -184,13 +184,56 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        const videoMap = {
-            'video1': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769359858/AH_vz7e8c.mp4',
-            'video2': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769359884/2h_ynzpqh.mp4',
-            'video3': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769359883/3h_il87e2.mp4',
-            'video4': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769359884/4h_mggeni.mp4',
-            'video5': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769359886/5h_ibpxqi.mp4'
+                const videoMap = {
+            // Spades (1-10)
+            '1': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769448416/2s_uqen8g.mp4',
+            '2': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769448414/3s_xsu5ss.mp4',
+            '3': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769448414/4s_pgind5.mp4',
+            '4': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769448413/5s_wrw6um.mp4',
+            '5': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769448415/6s_l3fnt2.mp4',
+            '6': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769448411/7s_bt0ejd.mp4',
+            '7': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769448411/8h_urhvtg.mp4',
+            '8': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769448428/9s_ns6m0b.mp4',
+            '9': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769448411/10s_tl2om9.mp4',
+            '10': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769448414/As_gpn9r9.mp4',
+
+            // Hearts (11-20)
+            '11': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769499785/2h_kmlgqn.mp4',
+            '12': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769499948/3h_rla2fp.mp4',
+            '13': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769499937/4h_bx2rvn.mp4',
+            '14': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769499892/5h_t9vio1.mp4',
+            '15': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769499901/6h_aahyaf.mp4',
+            '16': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769499925/7h_pbevxb.mp4',
+            '17': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769499921/8h_fvmtdr.mp4',
+            '18': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769499939/9h_zsb49m.mp4',
+            '19': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769499925/10h_npdx6y.mp4',
+            '20': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769499790/Ah_rvyui5.mp4',
+
+            // Clubs (21-30)
+            '21': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769494438/2c_jw9lsf.mp4',
+            '22': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769494438/3c_fucu3c.mp4',
+            '23': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769494438/4c_sjeacs.mp4',
+            '24': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769494437/5c_o1x7bh.mp4',
+            '25': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769494441/6c_po6e4y.mp4',
+            '26': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769494441/7c_brfdzi.mp4',
+            '27': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769494445/8c_x6mgha.mp4',
+            '28': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769494445/9c_cqbk3z.mp4',
+            '29': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769494445/10c_ljuoh1.mp4',
+            '30': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769494435/Ac_gzuxlv.mp4',
+
+            // Diamonds (31-40)
+            '31': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769503504/2d_goxhyk.mp4',
+            '32': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769503502/3d_n8ngg4.mp4',
+            '33': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769503500/4d_uqfppe.mp4',
+            '34': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769503491/5d_olbzjv.mp4',
+            '35': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769503493/6d_hdiitl.mp4',
+            '36': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769503496/7d_ft1r4x.mp4',
+            '37': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769503495/8d_us6w8x.mp4',
+            '38': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769503491/9d_bi67k3.mp4',
+            '39': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769503494/10d_dwbghm.mp4',
+            '40': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769503502/Ad_xwkb1m.mp4'
         };
+
 
         let active = document.getElementById('playerA');
         let hidden = document.getElementById('playerB');
