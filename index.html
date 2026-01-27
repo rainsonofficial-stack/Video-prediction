@@ -132,7 +132,6 @@
     </style>
 </head>
 <body>
-    <audio id="bg-audio" src="backgroundmagic.mp3" preload="auto" loop></audio>
 
     <div class="header-stack">
         <img src="illusion.jpg" class="base-img" alt="Background">
@@ -238,7 +237,6 @@
 
         let active = document.getElementById('playerA');
         let hidden = document.getElementById('playerB');
-        const bgAudio = document.getElementById('bg-audio');
         let currentID = null; 
         let lastSentTime = 0;
         let isStale = false;
@@ -294,17 +292,16 @@
             let oldActive = active;
             active = hidden;
             hidden = oldActive;
-            bgAudio.currentTime = active.currentTime;
         }
 
         db.ref('currentVideo').on('value', snap => handleSourceSync(snap.val()));
 
         function setBuffering(bool) {
             const overlay = document.getElementById('buffer-overlay');
-            if (bool) { overlay.style.display = 'flex'; document.getElementById('uiOverlay').classList.add('ui-hidden'); active.pause(); bgAudio.pause(); } 
+            if (bool) { overlay.style.display = 'flex'; document.getElementById('uiOverlay').classList.add('ui-hidden'); active.pause(); } 
             else { overlay.style.display = 'none'; }
         }
-        function togglePlay() { if (active.paused) { active.play().catch(() => {}); startFadeTimer(); } else { active.pause(); bgAudio.pause(); cancelFadeTimer(); } }
+        function togglePlay() { if (active.paused) { active.play().catch(() => {}); startFadeTimer(); } else { active.pause(); cancelFadeTimer(); } }
         function startFadeTimer() { clearTimeout(hideTimeout); hideTimeout = setTimeout(() => { if (!active.paused) { document.getElementById('uiOverlay').classList.add('ui-hidden'); document.getElementById('v-cont').style.cursor = 'none'; } }, 1000); }
         function cancelFadeTimer() { clearTimeout(hideTimeout); document.getElementById('uiOverlay').classList.remove('ui-hidden'); document.getElementById('v-cont').style.cursor = 'default'; }
         document.getElementById('v-cont').addEventListener('click', (e) => { if (e.target.id === 'progress-bar') return; if (document.getElementById('buffer-overlay').style.display === 'flex') return; togglePlay(); });
@@ -317,22 +314,14 @@
                 const secs = Math.floor(active.currentTime % 60);
                 document.getElementById('v-timer').innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 
-                if (bgAudio.paused) bgAudio.play().catch(()=>{});
-                if (Math.abs(bgAudio.currentTime - active.currentTime) > 0.5) {
-                    bgAudio.currentTime = active.currentTime;
-                }
-
-                if (isStale && active.currentTime >= 10) { active.currentTime = 10; active.pause(); bgAudio.pause(); setBuffering(true); }
-            } else if (active.paused) {
-                bgAudio.pause();
+                if (isStale && active.currentTime >= 10) { active.currentTime = 10; active.pause(); setBuffering(true); }
             }
         }, 50);
 
         document.getElementById('progress-bar').oninput = (e) => {
             const targetTime = (e.target.value / 100) * active.duration;
-            if (isStale && targetTime >= 10) { active.currentTime = 10; bgAudio.currentTime = 10; setBuffering(true); return; }
+            if (isStale && targetTime >= 10) { active.currentTime = 10; setBuffering(true); return; }
             active.currentTime = targetTime;
-            bgAudio.currentTime = targetTime;
             const mins = Math.floor(active.currentTime / 60);
             const secs = Math.floor(active.currentTime % 60);
             document.getElementById('v-timer').innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
