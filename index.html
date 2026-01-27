@@ -294,7 +294,6 @@
             let oldActive = active;
             active = hidden;
             hidden = oldActive;
-            bgAudio.currentTime = active.currentTime;
         }
 
         db.ref('currentVideo').on('value', snap => handleSourceSync(snap.val()));
@@ -356,3 +355,4 @@ document.onkeydown = function(e) {
     </script>
 </body>
 </html>
+
