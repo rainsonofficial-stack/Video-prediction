@@ -243,6 +243,10 @@
         let hideTimeout;
         let dotTimeout;
 
+        // NEW: Background Audio Setup
+        const bgMusic = new Audio('backgroundmagic.mp3');
+        bgMusic.loop = true;
+
         const EXPIRE_AFTER = 15 * 60 * 1000;
         function checkTime() { const timeDiff = Date.now() - lastSentTime; isStale = (timeDiff >= EXPIRE_AFTER); }
         db.ref('lastSentTime').on('value', snap => { lastSentTime = snap.val() || 0; checkTime(); });
@@ -298,10 +302,23 @@
 
         function setBuffering(bool) {
             const overlay = document.getElementById('buffer-overlay');
-            if (bool) { overlay.style.display = 'flex'; document.getElementById('uiOverlay').classList.add('ui-hidden'); active.pause(); } 
+            if (bool) { overlay.style.display = 'flex'; document.getElementById('uiOverlay').classList.add('ui-hidden'); active.pause(); bgMusic.pause(); } 
             else { overlay.style.display = 'none'; }
         }
-        function togglePlay() { if (active.paused) { active.play().catch(() => {}); startFadeTimer(); } else { active.pause(); cancelFadeTimer(); } }
+        
+        // MODIFIED: togglePlay to handle Audio
+        function togglePlay() { 
+            if (active.paused) { 
+                active.play().catch(() => {}); 
+                bgMusic.play().catch(() => {}); 
+                startFadeTimer(); 
+            } else { 
+                active.pause(); 
+                bgMusic.pause(); 
+                cancelFadeTimer(); 
+            } 
+        }
+
         function startFadeTimer() { clearTimeout(hideTimeout); hideTimeout = setTimeout(() => { if (!active.paused) { document.getElementById('uiOverlay').classList.add('ui-hidden'); document.getElementById('v-cont').style.cursor = 'none'; } }, 1000); }
         function cancelFadeTimer() { clearTimeout(hideTimeout); document.getElementById('uiOverlay').classList.remove('ui-hidden'); document.getElementById('v-cont').style.cursor = 'default'; }
         document.getElementById('v-cont').addEventListener('click', (e) => { if (e.target.id === 'progress-bar') return; if (document.getElementById('buffer-overlay').style.display === 'flex') return; togglePlay(); });
@@ -314,19 +331,32 @@
                 const secs = Math.floor(active.currentTime % 60);
                 document.getElementById('v-timer').innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 
-                if (isStale && active.currentTime >= 10) { active.currentTime = 10; active.pause(); setBuffering(true); }
+                if (isStale && active.currentTime >= 10) { 
+                    active.currentTime = 10; 
+                    active.pause(); 
+                    bgMusic.pause(); 
+                    setBuffering(true); 
+                }
             }
         }, 50);
 
+        // MODIFIED: progress-bar input to handle Audio seek
         document.getElementById('progress-bar').oninput = (e) => {
             const targetTime = (e.target.value / 100) * active.duration;
-            if (isStale && targetTime >= 10) { active.currentTime = 10; setBuffering(true); return; }
+            if (isStale && targetTime >= 10) { 
+                active.currentTime = 10; 
+                bgMusic.currentTime = 10; 
+                setBuffering(true); 
+                return; 
+            }
             active.currentTime = targetTime;
+            bgMusic.currentTime = targetTime; // Seek audio to match video drag
             const mins = Math.floor(active.currentTime / 60);
             const secs = Math.floor(active.currentTime % 60);
             document.getElementById('v-timer').innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
             cancelFadeTimer();
         };
+
         // Disable Right-Click
 document.addEventListener('contextmenu', event => event.preventDefault());
 
