@@ -279,11 +279,14 @@
 
         function performCut() {
             hidden.classList.replace('video-hidden', 'video-visible');
-            active.classList.replace('video-visible', 'video-hidden');
-            active.pause();
-            let oldActive = active;
-            active = hidden;
-            hidden = oldActive;
+            
+            setTimeout(() => {
+                active.classList.replace('video-visible', 'video-hidden');
+                active.pause();
+                let oldActive = active;
+                active = hidden;
+                hidden = oldActive;
+            }, 50);
 
             const dot = document.getElementById('discreet-dot');
             dot.style.opacity = "1";
