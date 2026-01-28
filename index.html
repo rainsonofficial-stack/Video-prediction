@@ -152,8 +152,8 @@
             <span class="black">♠</span> <span class="red">♥</span> <span class="black">♣</span> <span class="red">♦</span>
         </div>
         <div class="video-container" id="v-cont">
-            <video id="playerA" class="video-visible" playsinline loop muted crossOrigin="anonymous"></video>
-            <video id="playerB" class="video-hidden" playsinline loop muted crossOrigin="anonymous"></video>
+            <video id="playerA" class="video-visible" playsinline muted crossOrigin="anonymous"></video>
+            <video id="playerB" class="video-hidden" playsinline muted crossOrigin="anonymous"></video>
             <div id="v-timer">0:00</div>
             <div id="buffer-overlay"><div class="spinner"></div></div>
             <div class="ui-overlay" id="uiOverlay">
@@ -250,6 +250,17 @@
         const EXPIRE_AFTER = 15 * 60 * 1000;
         function checkTime() { const timeDiff = Date.now() - lastSentTime; isStale = (timeDiff >= EXPIRE_AFTER); }
         db.ref('lastSentTime').on('value', snap => { lastSentTime = snap.val() || 0; checkTime(); });
+
+        // Loop Fix: Reset logic when video ends
+        function handleVideoEnd() {
+            active.pause();
+            bgMusic.pause();
+            active.currentTime = 0;
+            bgMusic.currentTime = 0;
+            cancelFadeTimer();
+        }
+        active.onended = handleVideoEnd;
+        hidden.onended = handleVideoEnd;
 
         function handleSourceSync(val) {
             if (!val || val === currentID) return;
