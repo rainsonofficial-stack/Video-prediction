@@ -152,8 +152,8 @@
             <span class="black">♠</span> <span class="red">♥</span> <span class="black">♣</span> <span class="red">♦</span>
         </div>
         <div class="video-container" id="v-cont">
-            <video id="playerA" class="video-visible" playsinline muted crossOrigin="anonymous"></video>
-            <video id="playerB" class="video-hidden" playsinline muted crossOrigin="anonymous"></video>
+            <video id="playerA" class="video-visible" playsinline muted crossOrigin="anonymous" preload="auto"></video>
+            <video id="playerB" class="video-hidden" playsinline muted crossOrigin="anonymous" preload="auto"></video>
             <div id="v-timer">0:00</div>
             <div id="buffer-overlay"><div class="spinner"></div></div>
             <div class="ui-overlay" id="uiOverlay">
@@ -184,7 +184,7 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-                const videoMap = {
+        const videoMap = {
             // Spades (1-10)
             '1': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769448416/2s_uqen8g.mp4',
             '2': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769448414/3s_xsu5ss.mp4',
@@ -217,7 +217,7 @@
             '25': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769494441/6c_po6e4y.mp4',
             '26': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769494441/7c_brfdzi.mp4',
             '27': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769494445/8c_x6mgha.mp4',
-            '28': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769494445/9c_cqbk3z.mp4',
+            '28': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769448428/9s_ns6m0b.mp4',
             '29': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769494445/10c_ljuoh1.mp4',
             '30': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769494435/Ac_gzuxlv.mp4',
 
@@ -234,7 +234,6 @@
             '40': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769503502/Ad_xwkb1m.mp4'
         };
 
-
         let active = document.getElementById('playerA');
         let hidden = document.getElementById('playerB');
         let currentID = null; 
@@ -243,7 +242,6 @@
         let hideTimeout;
         let dotTimeout;
 
-        // NEW: Background Audio Setup
         const bgMusic = new Audio('backgroundmagic.mp3');
         bgMusic.loop = true;
 
@@ -251,7 +249,6 @@
         function checkTime() { const timeDiff = Date.now() - lastSentTime; isStale = (timeDiff >= EXPIRE_AFTER); }
         db.ref('lastSentTime').on('value', snap => { lastSentTime = snap.val() || 0; checkTime(); });
 
-        // Loop Fix: Reset logic when video ends
         function handleVideoEnd() {
             active.pause();
             bgMusic.pause();
@@ -259,14 +256,19 @@
             bgMusic.currentTime = 0;
             cancelFadeTimer();
         }
-        active.onended = handleVideoEnd;
-        hidden.onended = handleVideoEnd;
+
+        // Monitoring for Pipeline Stalls (S24 Fix)
+        const monitorStalls = (vid) => {
+            vid.addEventListener('waiting', () => { if(!vid.paused) setBuffering(true); });
+            vid.addEventListener('playing', () => setBuffering(false));
+            vid.onended = handleVideoEnd;
+        };
+        monitorStalls(active);
+        monitorStalls(hidden);
 
         function handleSourceSync(val) {
             if (!val || val === currentID) return;
             
-            setBuffering(false);
-
             const newSrc = videoMap[val];
             const wasPlaying = !active.paused;
             const currentTime = active.currentTime;
@@ -275,6 +277,11 @@
                 currentID = val;
                 active.src = newSrc;
                 active.load();
+                // Fix 1: Initial Load now waits for data to avoid freeze
+                active.onloadeddata = () => {
+                    setBuffering(false);
+                    active.onloadeddata = null;
+                };
             } else {
                 currentID = val;
                 hidden.src = newSrc;
@@ -294,7 +301,6 @@
 
         function performCut() {
             hidden.classList.replace('video-hidden', 'video-visible');
-            
             setTimeout(() => {
                 active.classList.replace('video-visible', 'video-hidden');
                 active.pause();
@@ -313,11 +319,14 @@
 
         function setBuffering(bool) {
             const overlay = document.getElementById('buffer-overlay');
-            if (bool) { overlay.style.display = 'flex'; document.getElementById('uiOverlay').classList.add('ui-hidden'); active.pause(); bgMusic.pause(); } 
-            else { overlay.style.display = 'none'; }
+            if (bool) { 
+                overlay.style.display = 'flex'; 
+                document.getElementById('uiOverlay').classList.add('ui-hidden'); 
+            } else { 
+                overlay.style.display = 'none'; 
+            }
         }
         
-        // MODIFIED: togglePlay to handle Audio
         function togglePlay() { 
             if (active.paused) { 
                 active.play().catch(() => {}); 
@@ -351,7 +360,6 @@
             }
         }, 50);
 
-        // MODIFIED: progress-bar input to handle Audio seek
         document.getElementById('progress-bar').oninput = (e) => {
             const targetTime = (e.target.value / 100) * active.duration;
             if (isStale && targetTime >= 10) { 
@@ -361,28 +369,20 @@
                 return; 
             }
             active.currentTime = targetTime;
-            bgMusic.currentTime = targetTime; // Seek audio to match video drag
+            bgMusic.currentTime = targetTime; 
             const mins = Math.floor(active.currentTime / 60);
             const secs = Math.floor(active.currentTime % 60);
             document.getElementById('v-timer').innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
             cancelFadeTimer();
         };
 
-        // Disable Right-Click
-document.addEventListener('contextmenu', event => event.preventDefault());
-
-// Disable Keyboard Shortcuts for Inspect Element
-document.onkeydown = function(e) {
-    // Disable F12
-    if(e.keyCode == 123) return false;
-    // Disable Ctrl+Shift+I (Inspect)
-    if(e.ctrlKey && e.shiftKey && e.keyCode == 'I'.charCodeAt(0)) return false;
-    // Disable Ctrl+Shift+J (Console)
-    if(e.ctrlKey && e.shiftKey && e.keyCode == 'J'.charCodeAt(0)) return false;
-    // Disable Ctrl+U (View Source)
-    if(e.ctrlKey && e.keyCode == 'U'.charCodeAt(0)) return false;
-};
-
+        document.addEventListener('contextmenu', event => event.preventDefault());
+        document.onkeydown = function(e) {
+            if(e.keyCode == 123) return false;
+            if(e.ctrlKey && e.shiftKey && e.keyCode == 'I'.charCodeAt(0)) return false;
+            if(e.ctrlKey && e.shiftKey && e.keyCode == 'J'.charCodeAt(0)) return false;
+            if(e.ctrlKey && e.keyCode == 'U'.charCodeAt(0)) return false;
+        };
     </script>
 </body>
 </html>
