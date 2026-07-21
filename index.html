@@ -2,8 +2,6 @@
 <html>
 <head>
     <title>Private Illusionist</title>
-    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Playfair+Display:ital@0;1&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body { 
@@ -67,6 +65,7 @@
             overflow: hidden;
             cursor: pointer;
             -webkit-tap-highlight-color: transparent;
+            touch-action: none;
         }
 
         video {
@@ -172,20 +171,10 @@
             document.getElementById('enqBtn').href = `mailto:management@rainsonofficial.com?subject=Magic Enquiry ${tierName}`;
         }
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyDxPQYrMlOslsqJeHnfj2MSpROZfaAwVH0",
-            authDomain: "rainson-magic.firebaseapp.com",
-            projectId: "rainson-magic",
-            databaseURL: "https://rainson-magic-default-rtdb.firebaseio.com",
-            storageBucket: "rainson-magic.firebasestorage.app",
-            messagingSenderId: "290150598500",
-            appId: "1:290150598500:web:4fbe7642b2baf839609c71"
-        };
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
-
+        // ============================================================
+        // VIDEO MAP (unchanged)
+        // ============================================================
         const videoMap = {
-            // Spades (1-10)
             '1': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769448416/2s_uqen8g.mp4',
             '2': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769448414/3s_xsu5ss.mp4',
             '3': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769448414/4s_pgind5.mp4',
@@ -196,8 +185,6 @@
             '8': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769448428/9s_ns6m0b.mp4',
             '9': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769448411/10s_tl2om9.mp4',
             '10': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769448414/As_gpn9r9.mp4',
-
-            // Hearts (11-20)
             '11': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769499785/2h_kmlgqn.mp4',
             '12': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769499948/3h_rla2fp.mp4',
             '13': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769499937/4h_bx2rvn.mp4',
@@ -208,8 +195,6 @@
             '18': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769499939/9h_zsb49m.mp4',
             '19': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769499925/10h_npdx6y.mp4',
             '20': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769499790/Ah_rvyui5.mp4',
-
-            // Clubs (21-30)
             '21': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769494438/2c_jw9lsf.mp4',
             '22': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769494438/3c_fucu3c.mp4',
             '23': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769494438/4c_sjeacs.mp4',
@@ -220,8 +205,6 @@
             '28': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769494445/9c_cqbk3z.mp4',
             '29': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769494445/10c_ljuoh1.mp4',
             '30': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769494435/Ac_gzuxlv.mp4',
-
-            // Diamonds (31-40)
             '31': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769503504/2d_goxhyk.mp4',
             '32': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769503502/3d_n8ngg4.mp4',
             '33': 'https://res.cloudinary.com/de76iytbx/video/upload/v1769503500/4d_uqfppe.mp4',
@@ -236,19 +219,183 @@
 
         let active = document.getElementById('playerA');
         let hidden = document.getElementById('playerB');
-        let currentID = null; 
-        let lastSentTime = 0;
-        let isStale = false;
-        let hideTimeout;
+        let currentID = null;
         let dotTimeout;
+        let hideTimeout;
 
         const bgMusic = new Audio('backgroundmagic.mp3');
         bgMusic.loop = true;
 
-        const EXPIRE_AFTER = 15 * 60 * 1000;
-        function checkTime() { const timeDiff = Date.now() - lastSentTime; isStale = (timeDiff >= EXPIRE_AFTER); }
-        db.ref('lastSentTime').on('value', snap => { lastSentTime = snap.val() || 0; checkTime(); });
+        // ============================================================
+        // ROUTING STATE (replaces the Firebase remote)
+        // ============================================================
+        let armed = false;
+        let stage = 0;                 // 0,1,2 = which decision is next ; 3 = routine complete
+        let route1 = null;             // 'A' | 'B'
+        let route2 = null;             // 'A1' | 'A2' | 'B1' | 'B2'
+        let inputsLocked = false;      // true after 36s of cumulative playtime
+        let sessionPlayedMs = 0;
+        let lastTickTs = null;
+        let recentMultiTouch = false;
 
+        // ---- Staleness protection (the "fake buffer" safety net) ----
+        // Only your genuine secret inputs (arming, or a valid routing tap) refresh this.
+        let lastInputTime = Date.now();
+        const STALE_MS = 15 * 60 * 1000;      // 15 minutes of no real input = protect the page
+        const STALE_FREEZE_POINT = 10;        // seconds into playback where it fakes a stall
+        function isStale() { return (Date.now() - lastInputTime) >= STALE_MS; }
+
+        const gridBase = { 'A1': 1, 'A2': 21, 'B1': 11, 'B2': 31 };
+        const doubleFingerVideo = { 'A1': '10', 'A2': '30', 'B1': '20', 'B2': '40' };
+        const DEAD_ZONE_FRACTION = 0.06; // 6% of width dead-centered = "do nothing"
+
+        // ============================================================
+        // PERSISTENCE — survives a page refresh mid-routine (same browser only)
+        // ============================================================
+        const STORAGE_KEY = 'illusionRoutingState';
+
+        function saveState() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                    currentID, stage, route1, route2, armed, inputsLocked, sessionPlayedMs, lastInputTime
+                }));
+            } catch (e) {}
+        }
+
+        function restoreState() {
+            let saved;
+            try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (e) { saved = null; }
+
+            if (!saved || !saved.currentID) {
+                // No prior session on this device at all (spectator's phone, fresh browser,
+                // cleared storage). Default to video 1, auto-playing, and treat it as already
+                // stale so the normal 10s freeze applies immediately — no separate branch needed.
+                currentID = '1';
+                stage = 0; route1 = null; route2 = null;
+                armed = false; inputsLocked = false; sessionPlayedMs = 0;
+                lastInputTime = 0; // forces isStale() === true right away
+
+                active.src = videoMap[currentID];
+                active.load();
+                setBuffering(true);
+                active.onloadeddata = () => {
+                    active.onloadeddata = null;
+                    setBuffering(false);
+                    active.play().catch(() => {});
+                    bgMusic.play().catch(() => {});
+                    startFadeTimer();
+                };
+                saveState();
+                return;
+            }
+
+            currentID = saved.currentID;
+            stage = saved.stage || 0;
+            route1 = saved.route1 || null;
+            route2 = saved.route2 || null;
+            armed = !!saved.armed;
+            inputsLocked = !!saved.inputsLocked;
+            sessionPlayedMs = saved.sessionPlayedMs || 0;
+            lastInputTime = saved.lastInputTime || Date.now();
+
+            // Load the last video, paused, ready for a resume tap. No forced freeze here —
+            // the timer loop's isStale() check handles capping it once it's actually played
+            // past STALE_FREEZE_POINT, same as it would on an un-refreshed page.
+            active.src = videoMap[currentID];
+            active.load();
+            setBuffering(true);
+            active.onloadeddata = () => {
+                active.onloadeddata = null;
+                setBuffering(false);
+            };
+        }
+
+        function flashDot(durationMs) {
+            const dot = document.getElementById('discreet-dot');
+            dot.style.opacity = "1";
+            clearTimeout(dotTimeout);
+            dotTimeout = setTimeout(() => { dot.style.opacity = "0"; }, durationMs);
+        }
+
+        // ---- Activation: double-tap the lower-right corner of the page ----
+        let lastCornerTap = 0;
+        function isCornerZone(x, y) {
+            return x > window.innerWidth * 0.85 && y > window.innerHeight * 0.85;
+        }
+        document.addEventListener('pointerup', (e) => {
+            if (!isCornerZone(e.clientX, e.clientY)) return;
+            const now = Date.now();
+            if (now - lastCornerTap < 400) {
+                armed = true;
+                stage = 0; route1 = null; route2 = null;
+                inputsLocked = false; sessionPlayedMs = 0; lastTickTs = null;
+                lastInputTime = now; // arming is a real input — wakes the page if it was stale
+                flashDot(5000);
+                saveState();
+            }
+            lastCornerTap = now;
+        });
+
+        // ---- Reading a resume-tap's position as a routing decision ----
+        function classifyX(x, w) {
+            const center = w / 2;
+            const half = (w * DEAD_ZONE_FRACTION) / 2;
+            if (Math.abs(x - center) <= half) return 'center';
+            return x < center ? 'left' : 'right';
+        }
+
+        function makeDecision(videoKey) {
+            lastInputTime = Date.now(); // real secret input — resets staleness too
+            stage++;
+            if (videoKey === currentID) {
+                // Same clip already loaded (e.g. A -> A1 both point at video 1): just resume in place.
+                active.play().catch(() => {});
+                bgMusic.play().catch(() => {});
+                startFadeTimer();
+                saveState();
+            } else {
+                handleSourceSync(videoKey);
+                saveState();
+            }
+        }
+
+        function handleStage1Tap(x, w) {
+            const side = classifyX(x, w);
+            if (side === 'center') return; // do nothing — stays paused, no input consumed
+            route1 = (side === 'left') ? 'A' : 'B';
+            makeDecision(side === 'left' ? '1' : '11');
+        }
+
+        function handleStage2Tap(x, w) {
+            const side = classifyX(x, w);
+            if (side === 'center') return;
+            let videoKey;
+            if (route1 === 'A') {
+                route2 = (side === 'left') ? 'A1' : 'A2';
+                videoKey = (side === 'left') ? '1' : '21';
+            } else {
+                route2 = (side === 'left') ? 'B1' : 'B2';
+                videoKey = (side === 'left') ? '11' : '31';
+            }
+            makeDecision(videoKey);
+        }
+
+        function handleStage3Tap(x, y, w, h) {
+            const col = Math.min(2, Math.floor((x / w) * 3));
+            const row = Math.min(2, Math.floor((y / h) * 3));
+            const zone = row * 3 + col + 1; // 1..9
+            const base = gridBase[route2];
+            makeDecision(String(base + zone - 1));
+        }
+
+        function handleDoubleFingerInput() {
+            if (!(armed && !inputsLocked && stage === 2 && active.paused)) return;
+            makeDecision(doubleFingerVideo[route2]);
+        }
+
+        // ============================================================
+        // CROSSFADE SWAP ENGINE (kept from the original build — untouched)
+        // ============================================================
         function handleVideoEnd() {
             active.pause();
             bgMusic.pause();
@@ -257,9 +404,8 @@
             cancelFadeTimer();
         }
 
-        // Monitoring for Pipeline Stalls (S24 Fix)
         const monitorStalls = (vid) => {
-            vid.addEventListener('waiting', () => { if(!vid.paused) setBuffering(true); });
+            vid.addEventListener('waiting', () => { if (!vid.paused) setBuffering(true); });
             vid.addEventListener('playing', () => setBuffering(false));
             vid.onended = handleVideoEnd;
         };
@@ -268,33 +414,32 @@
 
         function handleSourceSync(val) {
             if (!val || val === currentID) return;
-            
             const newSrc = videoMap[val];
-            const wasPlaying = !active.paused;
-            const currentTime = active.currentTime;
 
             if (currentID === null) {
                 currentID = val;
                 active.src = newSrc;
                 active.load();
-                // Fix 1: Initial Load now waits for data to avoid freeze
                 active.onloadeddata = () => {
-                    setBuffering(false);
                     active.onloadeddata = null;
+                    setBuffering(false);
+                    active.play().catch(() => {});
+                    bgMusic.play().catch(() => {});
+                    startFadeTimer();
                 };
             } else {
                 currentID = val;
                 hidden.src = newSrc;
-                hidden.currentTime = currentTime;
+                hidden.currentTime = 0;
                 hidden.load();
                 hidden.onloadeddata = () => {
-                    hidden.currentTime = active.currentTime;
-                    if (wasPlaying) {
-                        hidden.play().then(() => performCut()).catch(() => performCut());
-                    } else {
-                        performCut();
-                    }
                     hidden.onloadeddata = null;
+                    const newlyVisible = hidden; // capture before active/hidden get re-labeled
+                    performCut();
+                    newlyVisible.play().catch(() => {});
+                    bgMusic.play().catch(() => {});
+                    setBuffering(false);
+                    startFadeTimer();
                 };
             }
         }
@@ -309,81 +454,133 @@
                 hidden = oldActive;
             }, 50);
 
-            const dot = document.getElementById('discreet-dot');
-            dot.style.opacity = "1";
-            clearTimeout(dotTimeout);
-            dotTimeout = setTimeout(() => { dot.style.opacity = "0"; }, 15000);
+            flashDot(15000); // "signal received" indicator, same dot as activation
         }
-
-        db.ref('currentVideo').on('value', snap => handleSourceSync(snap.val()));
 
         function setBuffering(bool) {
             const overlay = document.getElementById('buffer-overlay');
-            if (bool) { 
-                overlay.style.display = 'flex'; 
-                document.getElementById('uiOverlay').classList.add('ui-hidden'); 
-            } else { 
-                overlay.style.display = 'none'; 
+            if (bool) {
+                overlay.style.display = 'flex';
+                document.getElementById('uiOverlay').classList.add('ui-hidden');
+            } else {
+                overlay.style.display = 'none';
             }
         }
-        
-        function togglePlay() { 
-            if (active.paused) { 
-                active.play().catch(() => {}); 
-                bgMusic.play().catch(() => {}); 
-                startFadeTimer(); 
-            } else { 
-                active.pause(); 
-                bgMusic.pause(); 
-                cancelFadeTimer(); 
-            } 
+
+        function togglePlay() {
+            if (active.paused) {
+                active.play().catch(() => {});
+                bgMusic.play().catch(() => {});
+                startFadeTimer();
+            } else {
+                active.pause();
+                bgMusic.pause();
+                cancelFadeTimer();
+            }
         }
 
         function startFadeTimer() { clearTimeout(hideTimeout); hideTimeout = setTimeout(() => { if (!active.paused) { document.getElementById('uiOverlay').classList.add('ui-hidden'); document.getElementById('v-cont').style.cursor = 'none'; } }, 1000); }
         function cancelFadeTimer() { clearTimeout(hideTimeout); document.getElementById('uiOverlay').classList.remove('ui-hidden'); document.getElementById('v-cont').style.cursor = 'default'; }
-        document.getElementById('v-cont').addEventListener('click', (e) => { if (e.target.id === 'progress-bar') return; if (document.getElementById('buffer-overlay').style.display === 'flex') return; togglePlay(); });
-        
+
+        // ============================================================
+        // INPUT: single-finger tap
+        // A tap while PAUSED is a "resume" — if armed/unlocked/mid-routine, its position
+        // is read as the routing decision. A tap while PLAYING is always a plain pause.
+        // ============================================================
+        const vCont = document.getElementById('v-cont');
+        vCont.addEventListener('click', (e) => {
+            if (e.target.id === 'progress-bar') return;
+            if (recentMultiTouch) return;
+            if (document.getElementById('buffer-overlay').style.display === 'flex') return; // genuinely/fake-stalled — ignore
+
+            if (active.paused && armed && !inputsLocked && stage < 3) {
+                const rect = vCont.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                if (stage === 0) handleStage1Tap(x, rect.width);
+                else if (stage === 1) handleStage2Tap(x, rect.width);
+                else if (stage === 2) handleStage3Tap(x, y, rect.width, rect.height);
+                return;
+            }
+
+            // Plain play/pause toggle — pre-arm, post-lock, or routine already complete
+            togglePlay();
+        });
+
+        // ---- Two-finger tap = the "10th video" in the current group (stage 3 only) ----
+        vCont.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 2) {
+                e.preventDefault();
+                recentMultiTouch = true;
+                setTimeout(() => { recentMultiTouch = false; }, 300);
+                handleDoubleFingerInput();
+            }
+        }, { passive: false });
+
+        // ============================================================
+        // TIMER LOOP: progress bar, clock, 36s input-lock, staleness fake-buffer
+        // ============================================================
         setInterval(() => {
             document.getElementById('playBtn').innerHTML = active.paused ? "&#9654;" : "||";
+
+            const now = Date.now();
+
+            // 36s cumulative-playtime lock (only accrues while armed)
+            if (!active.paused && armed) {
+                if (lastTickTs !== null) sessionPlayedMs += (now - lastTickTs);
+                lastTickTs = now;
+                if (!inputsLocked && sessionPlayedMs >= 36000) {
+                    inputsLocked = true;
+                }
+            } else {
+                lastTickTs = null;
+            }
+
+            // Staleness protection: no real input for STALE_MS -> cap playback and fake-stall
+            // once it's actually played past the freeze point.
+            if (isStale() && !active.paused && active.currentTime >= STALE_FREEZE_POINT) {
+                active.currentTime = STALE_FREEZE_POINT;
+                active.pause();
+                bgMusic.pause();
+                setBuffering(true);
+            }
+
             if (!active.paused && active.duration) {
                 document.getElementById('progress-bar').value = (active.currentTime / active.duration) * 100;
                 const mins = Math.floor(active.currentTime / 60);
                 const secs = Math.floor(active.currentTime % 60);
                 document.getElementById('v-timer').innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-
-                if (isStale && active.currentTime >= 10) { 
-                    active.currentTime = 10; 
-                    active.pause(); 
-                    bgMusic.pause(); 
-                    setBuffering(true); 
-                }
             }
+
+            saveState();
         }, 50);
 
         document.getElementById('progress-bar').oninput = (e) => {
             const targetTime = (e.target.value / 100) * active.duration;
-            if (isStale && targetTime >= 10) { 
-                active.currentTime = 10; 
-                bgMusic.currentTime = 10; 
-                setBuffering(true); 
-                return; 
+            if (isStale() && targetTime >= STALE_FREEZE_POINT) {
+                active.currentTime = STALE_FREEZE_POINT;
+                bgMusic.currentTime = STALE_FREEZE_POINT;
+                setBuffering(true);
+                return;
             }
             active.currentTime = targetTime;
-            bgMusic.currentTime = targetTime; 
+            bgMusic.currentTime = targetTime;
             const mins = Math.floor(active.currentTime / 60);
             const secs = Math.floor(active.currentTime % 60);
             document.getElementById('v-timer').innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
             cancelFadeTimer();
         };
 
+        // ---- Basic deterrents (limited — see earlier discussion) ----
         document.addEventListener('contextmenu', event => event.preventDefault());
-        document.onkeydown = function(e) {
-            if(e.keyCode == 123) return false;
-            if(e.ctrlKey && e.shiftKey && e.keyCode == 'I'.charCodeAt(0)) return false;
-            if(e.ctrlKey && e.shiftKey && e.keyCode == 'J'.charCodeAt(0)) return false;
-            if(e.ctrlKey && e.keyCode == 'U'.charCodeAt(0)) return false;
+        document.onkeydown = function (e) {
+            if (e.keyCode == 123) return false;
+            if (e.ctrlKey && e.shiftKey && e.keyCode == 'I'.charCodeAt(0)) return false;
+            if (e.ctrlKey && e.shiftKey && e.keyCode == 'J'.charCodeAt(0)) return false;
+            if (e.ctrlKey && e.keyCode == 'U'.charCodeAt(0)) return false;
         };
+
+        restoreState();
     </script>
 </body>
 </html>
-
