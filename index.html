@@ -90,7 +90,8 @@
             background: rgba(0,0,0,0.8); 
             display: none; 
             align-items: center; justify-content: center;
-            z-index: 100;
+            z-index: 200; /* was 100 — lower than .ui-overlay's 110, so the fading play
+                             button/progress bar were rendering ON TOP of the spinner */
             pointer-events: none;
         }
         .spinner {
@@ -447,7 +448,15 @@
 
         const monitorStalls = (vid) => {
             vid.addEventListener('waiting', () => { if (!vid.paused) setBuffering(true); });
-            vid.addEventListener('playing', () => setBuffering(false));
+            vid.addEventListener('playing', () => {
+                // Only react here for genuine stall-recovery on whichever element is
+                // CURRENTLY the active one. During a crossfade swap, 'hidden' fires its
+                // own 'playing' event too, but at that moment `active` still points to
+                // the old (paused) element — this bare check would misread that as
+                // "still paused" and wrongly reveal the button. The swap's own explicit
+                // listener (with the correct isPlayingHint) already handles that case.
+                if (vid === active) setBuffering(false);
+            });
             vid.onended = handleVideoEnd;
         };
         monitorStalls(active);
