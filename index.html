@@ -532,7 +532,13 @@
                 ui.classList.add('ui-hidden');
             } else {
                 overlay.style.display = 'none';
-                ui.classList.remove('ui-hidden');
+                // Only show the play button/progress bar if the video is genuinely
+                // paused (e.g. waiting for a first tap). If it's already playing —
+                // as it is right after a routing-tap resume — leave the UI hidden so
+                // there's no visible flash-then-fade of the controls.
+                if (active.paused) {
+                    ui.classList.remove('ui-hidden');
+                }
             }
         }
 
