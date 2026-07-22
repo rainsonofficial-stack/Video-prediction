@@ -245,7 +245,7 @@
         // A resume-tap only counts as routing input once the CURRENT clip has genuinely
         // played past 8s (or ended) — checked live against playback, never a sticky flag.
         let pastThreshold = false;
-        const INPUT_THRESHOLD_SEC = 8;
+        const INPUT_THRESHOLD_SEC = 6;
 
         const bgMusic = new Audio('backgroundmagic.mp3');
         bgMusic.loop = true;
