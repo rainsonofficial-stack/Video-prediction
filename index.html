@@ -2,12 +2,10 @@
 <html>
 <head>
     <title>Private Illusionist</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Playfair+Display:ital@0;1&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        html, body { touch-action: manipulation; }
         body { 
             margin: 0; padding: 0; 
             background: #000000; color: #d4af37; 
@@ -69,7 +67,7 @@
             overflow: hidden;
             cursor: pointer;
             -webkit-tap-highlight-color: transparent;
-            touch-action: none;
+            touch-action: manipulation;
         }
 
         video {
@@ -130,15 +128,18 @@
             z-index: 150; pointer-events: none; text-shadow: 0 0 5px rgba(0,0,0,1);
         }
 
-        .footer { width: 100%; padding: 60px 0 80px 0; text-align: center; color: #555; font-weight: bold; font-size: 1rem; letter-spacing: 5px; text-transform: uppercase; }
+        .footer {
+            width: 100%; padding: 60px 0 80px 0; text-align: center; color: #555;
+            font-weight: bold; font-size: 1rem; letter-spacing: 5px; text-transform: uppercase;
+            position: relative; /* anchor point for the corner-hit gesture zone */
+        }
         #discreet-dot { opacity: 0; transition: opacity 0.2s; }
 
+        /* Secret arm zone — lives in the footer (below the video), not floating over it */
         #corner-hit {
-            position: fixed;
+            position: absolute;
             right: 0; bottom: 0;
-            width: 32vw; height: 28vh;
-            max-width: 220px; max-height: 220px;
-            z-index: 9999;
+            width: 70px; height: 70px;
             touch-action: none;
             background: transparent;
         }
@@ -176,8 +177,9 @@
         </div>
     </div>
 
-    <div class="footer">♤ rainsonofficial.com<span id="discreet-dot">.</span></div>
-    <div id="corner-hit"></div>
+    <div class="footer">♤ rainsonofficial.com<span id="discreet-dot">.</span>
+        <div id="corner-hit"></div>
+    </div>
 
     <script>
         function selectTier(tierName, element) {
@@ -238,9 +240,8 @@
         let dotTimeout;
         let hideTimeout;
 
-        // Replaces the old, buggy "firstPlayDone" flag. A resume-tap only counts as
-        // routing input once the CURRENT clip has genuinely played past 8s (or ended) —
-        // checked live, not remembered as a one-time flag, so it can't get stuck "true".
+        // A resume-tap only counts as routing input once the CURRENT clip has genuinely
+        // played past 8s (or ended) — checked live against playback, never a sticky flag.
         let pastThreshold = false;
         const INPUT_THRESHOLD_SEC = 8;
 
@@ -335,7 +336,7 @@
             dotTimeout = setTimeout(() => { dot.style.opacity = "0"; }, durationMs);
         }
 
-        // ---- Activation: double-tap the dedicated invisible corner element ----
+        // ---- Activation: double-tap the small corner zone in the footer ----
         const cornerHit = document.getElementById('corner-hit');
         let lastCornerTap = 0;
         function armAndReset() {
@@ -343,13 +344,12 @@
             stage = 0; route1 = null; route2 = null;
             inputsLocked = false; sessionPlayedMs = 0; lastTickTs = null;
             lastInputTime = Date.now();
-            pastThreshold = false; // require fresh proof of real playback after (re-)arming
+            pastThreshold = false;
             flashDot(5000);
             saveState();
         }
-        cornerHit.addEventListener('touchstart', (e) => { e.preventDefault(); }, { passive: false });
         cornerHit.addEventListener('touchend', (e) => {
-            e.preventDefault();
+            e.preventDefault(); // best-effort: stops native double-tap-zoom on this small zone
             const now = Date.now();
             if (now - lastCornerTap < 400) armAndReset();
             lastCornerTap = now;
@@ -420,7 +420,7 @@
         // CROSSFADE SWAP ENGINE
         // ============================================================
         function handleVideoEnd() {
-            pastThreshold = true; // reaching the end is always a legitimate checkpoint
+            pastThreshold = true;
             active.pause();
             bgMusic.pause();
             active.currentTime = 0;
@@ -444,7 +444,7 @@
 
             if (currentID === null) {
                 currentID = val;
-                pastThreshold = false; // new clip — needs its own proof of playback
+                pastThreshold = false;
                 active.src = newSrc;
                 active.load();
                 active.onloadeddata = () => {
@@ -458,7 +458,7 @@
                 };
             } else {
                 currentID = val;
-                pastThreshold = false; // new clip — needs its own proof of playback
+                pastThreshold = false;
                 hidden.src = newSrc;
                 hidden.load();
                 hidden.onloadeddata = () => {
@@ -500,7 +500,7 @@
                 ui.classList.add('ui-hidden');
             } else {
                 overlay.style.display = 'none';
-                ui.classList.remove('ui-hidden'); // FIX: previously stayed hidden forever
+                ui.classList.remove('ui-hidden');
             }
         }
 
@@ -561,7 +561,6 @@
                 pastThreshold = true;
             }
 
-            // Disable the seek bar's hit area during the 3x3 grid stage so grid taps register.
             if (armed && !inputsLocked && stage === 2 && active.paused && pastThreshold) {
                 progressBarEl.style.pointerEvents = 'none';
             } else {
@@ -643,3 +642,4 @@
     </script>
 </body>
 </html>
+
