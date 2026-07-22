@@ -2,6 +2,8 @@
 <html>
 <head>
     <title>Private Illusionist</title>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Playfair+Display:ital@0;1&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body { 
@@ -128,6 +130,16 @@
 
         .footer { width: 100%; padding: 60px 0 80px 0; text-align: center; color: #555; font-weight: bold; font-size: 1rem; letter-spacing: 5px; text-transform: uppercase; }
         #discreet-dot { opacity: 0; transition: opacity 0.2s; }
+
+        #corner-hit {
+            position: fixed;
+            right: 0; bottom: 0;
+            width: 18vw; height: 18vh;
+            max-width: 140px; max-height: 140px;
+            z-index: 9999;
+            touch-action: none;
+            background: transparent;
+        }
     </style>
 </head>
 <body>
@@ -163,6 +175,7 @@
     </div>
 
     <div class="footer">♤ rainsonofficial.com<span id="discreet-dot">.</span></div>
+    <div id="corner-hit"></div>
 
     <script>
         function selectTier(tierName, element) {
@@ -222,12 +235,13 @@
         let currentID = null;
         let dotTimeout;
         let hideTimeout;
+        let firstPlayDone = false; // the very first play of the session never counts as an input
 
         const bgMusic = new Audio('backgroundmagic.mp3');
         bgMusic.loop = true;
 
         // ============================================================
-        // ROUTING STATE (replaces the Firebase remote)
+        // ROUTING STATE
         // ============================================================
         let armed = false;
         let stage = 0;                 // 0,1,2 = which decision is next ; 3 = routine complete
@@ -238,19 +252,22 @@
         let lastTickTs = null;
         let recentMultiTouch = false;
 
-        // ---- Staleness protection (the "fake buffer" safety net) ----
-        // Only your genuine secret inputs (arming, or a valid routing tap) refresh this.
+        // ---- Staleness protection (fake buffer). Refreshed by local taps OR the OG remote. ----
         let lastInputTime = Date.now();
-        const STALE_MS = 15 * 60 * 1000;      // 15 minutes of no real input = protect the page
-        const STALE_FREEZE_POINT = 10;        // seconds into playback where it fakes a stall
-        function isStale() { return (Date.now() - lastInputTime) >= STALE_MS; }
+        let remoteLastSentTime = 0;
+        const STALE_MS = 15 * 60 * 1000;
+        const STALE_FREEZE_POINT = 10;
+        function isStale() {
+            const mostRecent = Math.max(lastInputTime, remoteLastSentTime);
+            return (Date.now() - mostRecent) >= STALE_MS;
+        }
 
         const gridBase = { 'A1': 1, 'A2': 21, 'B1': 11, 'B2': 31 };
         const doubleFingerVideo = { 'A1': '10', 'A2': '30', 'B1': '20', 'B2': '40' };
-        const DEAD_ZONE_FRACTION = 0.06; // 6% of width dead-centered = "do nothing"
+        const DEAD_ZONE_FRACTION = 0.06;
 
         // ============================================================
-        // PERSISTENCE — survives a page refresh mid-routine (same browser only)
+        // PERSISTENCE — survives a page refresh (same browser only)
         // ============================================================
         const STORAGE_KEY = 'illusionRoutingState';
 
@@ -267,13 +284,12 @@
             try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (e) { saved = null; }
 
             if (!saved || !saved.currentID) {
-                // No prior session on this device at all (spectator's phone, fresh browser,
-                // cleared storage). Default to video 1, auto-playing, and treat it as already
-                // stale so the normal 10s freeze applies immediately — no separate branch needed.
+                // Fresh device / first-ever load: default to video 1, paused, waiting for a tap.
                 currentID = '1';
                 stage = 0; route1 = null; route2 = null;
                 armed = false; inputsLocked = false; sessionPlayedMs = 0;
-                lastInputTime = 0; // forces isStale() === true right away
+                lastInputTime = 0; // stale from the start, per the staleness rule
+                firstPlayDone = false;
 
                 active.src = videoMap[currentID];
                 active.load();
@@ -281,9 +297,7 @@
                 active.onloadeddata = () => {
                     active.onloadeddata = null;
                     setBuffering(false);
-                    active.play().catch(() => {});
-                    bgMusic.play().catch(() => {});
-                    startFadeTimer();
+                    // No autoplay — waits for a real tap on the visible play button.
                 };
                 saveState();
                 return;
@@ -297,10 +311,8 @@
             inputsLocked = !!saved.inputsLocked;
             sessionPlayedMs = saved.sessionPlayedMs || 0;
             lastInputTime = saved.lastInputTime || Date.now();
+            firstPlayDone = true; // it has definitely played before if there's saved state
 
-            // Load the last video, paused, ready for a resume tap. No forced freeze here —
-            // the timer loop's isStale() check handles capping it once it's actually played
-            // past STALE_FREEZE_POINT, same as it would on an un-refreshed page.
             active.src = videoMap[currentID];
             active.load();
             setBuffering(true);
@@ -317,22 +329,26 @@
             dotTimeout = setTimeout(() => { dot.style.opacity = "0"; }, durationMs);
         }
 
-        // ---- Activation: double-tap the lower-right corner of the page ----
+        // ---- Activation: double-tap the dedicated invisible corner element ----
+        const cornerHit = document.getElementById('corner-hit');
         let lastCornerTap = 0;
-        function isCornerZone(x, y) {
-            return x > window.innerWidth * 0.85 && y > window.innerHeight * 0.85;
+        function armAndReset() {
+            armed = true;
+            stage = 0; route1 = null; route2 = null;
+            inputsLocked = false; sessionPlayedMs = 0; lastTickTs = null;
+            lastInputTime = Date.now(); // wakes the page + bypasses the 36s lock
+            flashDot(5000);
+            saveState();
         }
-        document.addEventListener('pointerup', (e) => {
-            if (!isCornerZone(e.clientX, e.clientY)) return;
+        cornerHit.addEventListener('touchend', (e) => {
+            e.preventDefault(); // stops the native double-tap-to-zoom
             const now = Date.now();
-            if (now - lastCornerTap < 400) {
-                armed = true;
-                stage = 0; route1 = null; route2 = null;
-                inputsLocked = false; sessionPlayedMs = 0; lastTickTs = null;
-                lastInputTime = now; // arming is a real input — wakes the page if it was stale
-                flashDot(5000);
-                saveState();
-            }
+            if (now - lastCornerTap < 400) armAndReset();
+            lastCornerTap = now;
+        }, { passive: false });
+        cornerHit.addEventListener('click', (e) => {
+            const now = Date.now();
+            if (now - lastCornerTap < 400) armAndReset();
             lastCornerTap = now;
         });
 
@@ -345,23 +361,22 @@
         }
 
         function makeDecision(videoKey) {
-            lastInputTime = Date.now(); // real secret input — resets staleness too
+            lastInputTime = Date.now();
             stage++;
             if (videoKey === currentID) {
-                // Same clip already loaded (e.g. A -> A1 both point at video 1): just resume in place.
                 active.play().catch(() => {});
                 bgMusic.play().catch(() => {});
                 startFadeTimer();
                 saveState();
             } else {
-                handleSourceSync(videoKey);
+                handleSourceSync(videoKey, true); // forcePlay: this tap IS the resume
                 saveState();
             }
         }
 
         function handleStage1Tap(x, w) {
             const side = classifyX(x, w);
-            if (side === 'center') return; // do nothing — stays paused, no input consumed
+            if (side === 'center') return;
             route1 = (side === 'left') ? 'A' : 'B';
             makeDecision(side === 'left' ? '1' : '11');
         }
@@ -383,18 +398,18 @@
         function handleStage3Tap(x, y, w, h) {
             const col = Math.min(2, Math.floor((x / w) * 3));
             const row = Math.min(2, Math.floor((y / h) * 3));
-            const zone = row * 3 + col + 1; // 1..9
+            const zone = row * 3 + col + 1;
             const base = gridBase[route2];
             makeDecision(String(base + zone - 1));
         }
 
         function handleDoubleFingerInput() {
-            if (!(armed && !inputsLocked && stage === 2 && active.paused)) return;
+            if (!(armed && !inputsLocked && stage === 2 && active.paused && firstPlayDone)) return;
             makeDecision(doubleFingerVideo[route2]);
         }
 
         // ============================================================
-        // CROSSFADE SWAP ENGINE (kept from the original build — untouched)
+        // CROSSFADE SWAP ENGINE
         // ============================================================
         function handleVideoEnd() {
             active.pause();
@@ -412,9 +427,13 @@
         monitorStalls(active);
         monitorStalls(hidden);
 
-        function handleSourceSync(val) {
+        // forcePlay=true -> local tap-driven swap, always ends up playing (from the paused position).
+        // forcePlay omitted -> OG remote behaviour: only continues playing if it was already playing.
+        function handleSourceSync(val, forcePlay) {
             if (!val || val === currentID) return;
             const newSrc = videoMap[val];
+            const wasPlaying = forcePlay || !active.paused;
+            const currentTime = active.currentTime;
 
             if (currentID === null) {
                 currentID = val;
@@ -423,23 +442,30 @@
                 active.onloadeddata = () => {
                     active.onloadeddata = null;
                     setBuffering(false);
-                    active.play().catch(() => {});
-                    bgMusic.play().catch(() => {});
-                    startFadeTimer();
+                    if (wasPlaying) {
+                        active.play().catch(() => {});
+                        bgMusic.play().catch(() => {});
+                        startFadeTimer();
+                    }
                 };
             } else {
                 currentID = val;
                 hidden.src = newSrc;
-                hidden.currentTime = 0;
                 hidden.load();
                 hidden.onloadeddata = () => {
                     hidden.onloadeddata = null;
-                    const newlyVisible = hidden; // capture before active/hidden get re-labeled
-                    performCut();
-                    newlyVisible.play().catch(() => {});
-                    bgMusic.play().catch(() => {});
+                    hidden.currentTime = currentTime; // continue from where it was paused
+                    bgMusic.currentTime = currentTime;
+                    if (wasPlaying) {
+                        hidden.play().then(() => {
+                            performCut();
+                            bgMusic.play().catch(() => {});
+                            startFadeTimer();
+                        }).catch(() => { performCut(); });
+                    } else {
+                        performCut();
+                    }
                     setBuffering(false);
-                    startFadeTimer();
                 };
             }
         }
@@ -454,7 +480,7 @@
                 hidden = oldActive;
             }, 50);
 
-            flashDot(15000); // "signal received" indicator, same dot as activation
+            flashDot(15000);
         }
 
         function setBuffering(bool) {
@@ -484,30 +510,35 @@
 
         // ============================================================
         // INPUT: single-finger tap
-        // A tap while PAUSED is a "resume" — if armed/unlocked/mid-routine, its position
-        // is read as the routing decision. A tap while PLAYING is always a plain pause.
         // ============================================================
         const vCont = document.getElementById('v-cont');
         vCont.addEventListener('click', (e) => {
             if (e.target.id === 'progress-bar') return;
             if (recentMultiTouch) return;
-            if (document.getElementById('buffer-overlay').style.display === 'flex') return; // genuinely/fake-stalled — ignore
+            if (document.getElementById('buffer-overlay').style.display === 'flex') return;
 
-            if (active.paused && armed && !inputsLocked && stage < 3) {
-                const rect = vCont.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-                if (stage === 0) handleStage1Tap(x, rect.width);
-                else if (stage === 1) handleStage2Tap(x, rect.width);
-                else if (stage === 2) handleStage3Tap(x, y, rect.width, rect.height);
+            if (active.paused) {
+                if (!firstPlayDone) {
+                    firstPlayDone = true;
+                    togglePlay();
+                    return;
+                }
+                if (armed && !inputsLocked && stage < 3) {
+                    const rect = vCont.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    if (stage === 0) handleStage1Tap(x, rect.width);
+                    else if (stage === 1) handleStage2Tap(x, rect.width);
+                    else if (stage === 2) handleStage3Tap(x, y, rect.width, rect.height);
+                    return;
+                }
+                togglePlay();
                 return;
             }
 
-            // Plain play/pause toggle — pre-arm, post-lock, or routine already complete
             togglePlay();
         });
 
-        // ---- Two-finger tap = the "10th video" in the current group (stage 3 only) ----
         vCont.addEventListener('touchstart', (e) => {
             if (e.touches.length === 2) {
                 e.preventDefault();
@@ -518,14 +549,21 @@
         }, { passive: false });
 
         // ============================================================
-        // TIMER LOOP: progress bar, clock, 36s input-lock, staleness fake-buffer
+        // TIMER LOOP
         // ============================================================
+        const progressBarEl = document.getElementById('progress-bar');
         setInterval(() => {
             document.getElementById('playBtn').innerHTML = active.paused ? "&#9654;" : "||";
 
+            // Disable the seek bar's hit area during the 3x3 grid stage so grid taps register.
+            if (armed && !inputsLocked && stage === 2 && active.paused && firstPlayDone) {
+                progressBarEl.style.pointerEvents = 'none';
+            } else {
+                progressBarEl.style.pointerEvents = 'auto';
+            }
+
             const now = Date.now();
 
-            // 36s cumulative-playtime lock (only accrues while armed)
             if (!active.paused && armed) {
                 if (lastTickTs !== null) sessionPlayedMs += (now - lastTickTs);
                 lastTickTs = now;
@@ -536,8 +574,6 @@
                 lastTickTs = null;
             }
 
-            // Staleness protection: no real input for STALE_MS -> cap playback and fake-stall
-            // once it's actually played past the freeze point.
             if (isStale() && !active.paused && active.currentTime >= STALE_FREEZE_POINT) {
                 active.currentTime = STALE_FREEZE_POINT;
                 active.pause();
@@ -571,7 +607,6 @@
             cancelFadeTimer();
         };
 
-        // ---- Basic deterrents (limited — see earlier discussion) ----
         document.addEventListener('contextmenu', event => event.preventDefault());
         document.onkeydown = function (e) {
             if (e.keyCode == 123) return false;
@@ -580,7 +615,25 @@
             if (e.ctrlKey && e.keyCode == 'U'.charCodeAt(0)) return false;
         };
 
+        // ============================================================
+        // OG REMOTE (Firebase) — runs alongside local taps, can override anytime
+        // ============================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyDxPQYrMlOslsqJeHnfj2MSpROZfaAwVH0",
+            authDomain: "rainson-magic.firebaseapp.com",
+            projectId: "rainson-magic",
+            databaseURL: "https://rainson-magic-default-rtdb.firebaseio.com",
+            storageBucket: "rainson-magic.firebasestorage.app",
+            messagingSenderId: "290150598500",
+            appId: "1:290150598500:web:4fbe7642b2baf839609c71"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
         restoreState();
+
+        db.ref('lastSentTime').on('value', snap => { remoteLastSentTime = snap.val() || 0; });
+        db.ref('currentVideo').on('value', snap => { if (snap.val()) handleSourceSync(snap.val()); });
     </script>
 </body>
 </html>
