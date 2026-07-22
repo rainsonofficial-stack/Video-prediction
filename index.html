@@ -2,10 +2,12 @@
 <html>
 <head>
     <title>Private Illusionist</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Playfair+Display:ital@0;1&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <style>
+        html, body { touch-action: manipulation; }
         body { 
             margin: 0; padding: 0; 
             background: #000000; color: #d4af37; 
@@ -134,8 +136,8 @@
         #corner-hit {
             position: fixed;
             right: 0; bottom: 0;
-            width: 18vw; height: 18vh;
-            max-width: 140px; max-height: 140px;
+            width: 32vw; height: 28vh;
+            max-width: 220px; max-height: 220px;
             z-index: 9999;
             touch-action: none;
             background: transparent;
@@ -235,7 +237,12 @@
         let currentID = null;
         let dotTimeout;
         let hideTimeout;
-        let firstPlayDone = false; // the very first play of the session never counts as an input
+
+        // Replaces the old, buggy "firstPlayDone" flag. A resume-tap only counts as
+        // routing input once the CURRENT clip has genuinely played past 8s (or ended) —
+        // checked live, not remembered as a one-time flag, so it can't get stuck "true".
+        let pastThreshold = false;
+        const INPUT_THRESHOLD_SEC = 8;
 
         const bgMusic = new Audio('backgroundmagic.mp3');
         bgMusic.loop = true;
@@ -244,15 +251,14 @@
         // ROUTING STATE
         // ============================================================
         let armed = false;
-        let stage = 0;                 // 0,1,2 = which decision is next ; 3 = routine complete
-        let route1 = null;             // 'A' | 'B'
-        let route2 = null;             // 'A1' | 'A2' | 'B1' | 'B2'
-        let inputsLocked = false;      // true after 36s of cumulative playtime
+        let stage = 0;
+        let route1 = null;
+        let route2 = null;
+        let inputsLocked = false;
         let sessionPlayedMs = 0;
         let lastTickTs = null;
         let recentMultiTouch = false;
 
-        // ---- Staleness protection (fake buffer). Refreshed by local taps OR the OG remote. ----
         let lastInputTime = Date.now();
         let remoteLastSentTime = 0;
         const STALE_MS = 15 * 60 * 1000;
@@ -267,14 +273,15 @@
         const DEAD_ZONE_FRACTION = 0.06;
 
         // ============================================================
-        // PERSISTENCE — survives a page refresh (same browser only)
+        // PERSISTENCE
         // ============================================================
         const STORAGE_KEY = 'illusionRoutingState';
 
         function saveState() {
             try {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify({
-                    currentID, stage, route1, route2, armed, inputsLocked, sessionPlayedMs, lastInputTime
+                    currentID, stage, route1, route2, armed, inputsLocked,
+                    sessionPlayedMs, lastInputTime, pastThreshold
                 }));
             } catch (e) {}
         }
@@ -284,12 +291,11 @@
             try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (e) { saved = null; }
 
             if (!saved || !saved.currentID) {
-                // Fresh device / first-ever load: default to video 1, paused, waiting for a tap.
                 currentID = '1';
                 stage = 0; route1 = null; route2 = null;
                 armed = false; inputsLocked = false; sessionPlayedMs = 0;
-                lastInputTime = 0; // stale from the start, per the staleness rule
-                firstPlayDone = false;
+                lastInputTime = 0;
+                pastThreshold = false;
 
                 active.src = videoMap[currentID];
                 active.load();
@@ -311,7 +317,7 @@
             inputsLocked = !!saved.inputsLocked;
             sessionPlayedMs = saved.sessionPlayedMs || 0;
             lastInputTime = saved.lastInputTime || Date.now();
-            firstPlayDone = true; // it has definitely played before if there's saved state
+            pastThreshold = !!saved.pastThreshold;
 
             active.src = videoMap[currentID];
             active.load();
@@ -336,12 +342,14 @@
             armed = true;
             stage = 0; route1 = null; route2 = null;
             inputsLocked = false; sessionPlayedMs = 0; lastTickTs = null;
-            lastInputTime = Date.now(); // wakes the page + bypasses the 36s lock
+            lastInputTime = Date.now();
+            pastThreshold = false; // require fresh proof of real playback after (re-)arming
             flashDot(5000);
             saveState();
         }
+        cornerHit.addEventListener('touchstart', (e) => { e.preventDefault(); }, { passive: false });
         cornerHit.addEventListener('touchend', (e) => {
-            e.preventDefault(); // stops the native double-tap-to-zoom
+            e.preventDefault();
             const now = Date.now();
             if (now - lastCornerTap < 400) armAndReset();
             lastCornerTap = now;
@@ -369,7 +377,7 @@
                 startFadeTimer();
                 saveState();
             } else {
-                handleSourceSync(videoKey, true); // forcePlay: this tap IS the resume
+                handleSourceSync(videoKey, true);
                 saveState();
             }
         }
@@ -404,7 +412,7 @@
         }
 
         function handleDoubleFingerInput() {
-            if (!(armed && !inputsLocked && stage === 2 && active.paused && firstPlayDone)) return;
+            if (!(armed && !inputsLocked && stage === 2 && active.paused && pastThreshold)) return;
             makeDecision(doubleFingerVideo[route2]);
         }
 
@@ -412,6 +420,7 @@
         // CROSSFADE SWAP ENGINE
         // ============================================================
         function handleVideoEnd() {
+            pastThreshold = true; // reaching the end is always a legitimate checkpoint
             active.pause();
             bgMusic.pause();
             active.currentTime = 0;
@@ -427,8 +436,6 @@
         monitorStalls(active);
         monitorStalls(hidden);
 
-        // forcePlay=true -> local tap-driven swap, always ends up playing (from the paused position).
-        // forcePlay omitted -> OG remote behaviour: only continues playing if it was already playing.
         function handleSourceSync(val, forcePlay) {
             if (!val || val === currentID) return;
             const newSrc = videoMap[val];
@@ -437,6 +444,7 @@
 
             if (currentID === null) {
                 currentID = val;
+                pastThreshold = false; // new clip — needs its own proof of playback
                 active.src = newSrc;
                 active.load();
                 active.onloadeddata = () => {
@@ -450,11 +458,12 @@
                 };
             } else {
                 currentID = val;
+                pastThreshold = false; // new clip — needs its own proof of playback
                 hidden.src = newSrc;
                 hidden.load();
                 hidden.onloadeddata = () => {
                     hidden.onloadeddata = null;
-                    hidden.currentTime = currentTime; // continue from where it was paused
+                    hidden.currentTime = currentTime;
                     bgMusic.currentTime = currentTime;
                     if (wasPlaying) {
                         hidden.play().then(() => {
@@ -485,11 +494,13 @@
 
         function setBuffering(bool) {
             const overlay = document.getElementById('buffer-overlay');
+            const ui = document.getElementById('uiOverlay');
             if (bool) {
                 overlay.style.display = 'flex';
-                document.getElementById('uiOverlay').classList.add('ui-hidden');
+                ui.classList.add('ui-hidden');
             } else {
                 overlay.style.display = 'none';
+                ui.classList.remove('ui-hidden'); // FIX: previously stayed hidden forever
             }
         }
 
@@ -517,22 +528,13 @@
             if (recentMultiTouch) return;
             if (document.getElementById('buffer-overlay').style.display === 'flex') return;
 
-            if (active.paused) {
-                if (!firstPlayDone) {
-                    firstPlayDone = true;
-                    togglePlay();
-                    return;
-                }
-                if (armed && !inputsLocked && stage < 3) {
-                    const rect = vCont.getBoundingClientRect();
-                    const x = e.clientX - rect.left;
-                    const y = e.clientY - rect.top;
-                    if (stage === 0) handleStage1Tap(x, rect.width);
-                    else if (stage === 1) handleStage2Tap(x, rect.width);
-                    else if (stage === 2) handleStage3Tap(x, y, rect.width, rect.height);
-                    return;
-                }
-                togglePlay();
+            if (active.paused && armed && !inputsLocked && stage < 3 && pastThreshold) {
+                const rect = vCont.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                if (stage === 0) handleStage1Tap(x, rect.width);
+                else if (stage === 1) handleStage2Tap(x, rect.width);
+                else if (stage === 2) handleStage3Tap(x, y, rect.width, rect.height);
                 return;
             }
 
@@ -555,8 +557,12 @@
         setInterval(() => {
             document.getElementById('playBtn').innerHTML = active.paused ? "&#9654;" : "||";
 
+            if (!active.paused && active.currentTime >= INPUT_THRESHOLD_SEC) {
+                pastThreshold = true;
+            }
+
             // Disable the seek bar's hit area during the 3x3 grid stage so grid taps register.
-            if (armed && !inputsLocked && stage === 2 && active.paused && firstPlayDone) {
+            if (armed && !inputsLocked && stage === 2 && active.paused && pastThreshold) {
                 progressBarEl.style.pointerEvents = 'none';
             } else {
                 progressBarEl.style.pointerEvents = 'auto';
