@@ -331,7 +331,12 @@
             };
         }
 
+        // Suppresses dot flashes for a moment right after load — Firebase's listeners
+        // always fire once immediately with whatever is currently stored in the DB
+        // (even old, leftover data), which shouldn't be mistaken for a real new input.
+        const dotSuppressedUntil = Date.now() + 2000;
         function flashDot(durationMs) {
+            if (Date.now() < dotSuppressedUntil) return;
             const dot = document.getElementById('discreet-dot');
             dot.style.opacity = "1";
             clearTimeout(dotTimeout);
@@ -381,10 +386,10 @@
                 // frame has been decoded and painted yet.
                 const onPlaying = () => {
                     active.removeEventListener('playing', onPlaying);
-                    setBuffering(false);
+                    setBuffering(false, true); // genuinely playing now
                 };
                 active.addEventListener('playing', onPlaying);
-                active.play().catch(() => setBuffering(false));
+                active.play().catch(() => setBuffering(false, false));
                 bgMusic.play().catch(() => {});
                 startFadeTimer();
                 saveState();
@@ -468,14 +473,14 @@
                         // that a real frame is decoded and on screen — before revealing.
                         const onPlaying = () => {
                             active.removeEventListener('playing', onPlaying);
-                            setBuffering(false);
+                            setBuffering(false, true); // genuinely playing now
                         };
                         active.addEventListener('playing', onPlaying);
-                        active.play().catch(() => setBuffering(false));
+                        active.play().catch(() => setBuffering(false, false));
                         bgMusic.play().catch(() => {});
                         startFadeTimer();
                     } else {
-                        setBuffering(false); // static paused first frame — no motion, safe to reveal
+                        setBuffering(false, false); // static paused first frame — no motion, safe to reveal
                     }
                 };
             } else {
@@ -490,22 +495,27 @@
                     if (wasPlaying) {
                         // Do the crossfade cut AND clear the buffer together, only once
                         // hidden actually confirms it's rendering — never on a timer guess.
+                        // IMPORTANT: pass playing=true explicitly here. At this exact moment
+                        // the global `active` variable still points to the OLD (paused)
+                        // video — the active/hidden reference swap only happens 50ms later,
+                        // inside performCut()'s internal timer. Checking active.paused here
+                        // would incorrectly read "paused" and flash the play button.
                         const onPlaying = () => {
                             hidden.removeEventListener('playing', onPlaying);
                             performCut();
                             bgMusic.play().catch(() => {});
                             startFadeTimer();
-                            setBuffering(false);
+                            setBuffering(false, true);
                         };
                         hidden.addEventListener('playing', onPlaying);
                         hidden.play().catch(() => {
                             hidden.removeEventListener('playing', onPlaying);
                             performCut();
-                            setBuffering(false);
+                            setBuffering(false, false);
                         });
                     } else {
                         performCut();
-                        setBuffering(false); // staying paused — static frame, safe to reveal
+                        setBuffering(false, false); // staying paused — static frame, safe to reveal
                     }
                 };
             }
@@ -524,7 +534,7 @@
             flashDot(15000);
         }
 
-        function setBuffering(bool) {
+        function setBuffering(bool, isPlayingHint) {
             const overlay = document.getElementById('buffer-overlay');
             const ui = document.getElementById('uiOverlay');
             if (bool) {
@@ -533,10 +543,13 @@
             } else {
                 overlay.style.display = 'none';
                 // Only show the play button/progress bar if the video is genuinely
-                // paused (e.g. waiting for a first tap). If it's already playing —
-                // as it is right after a routing-tap resume — leave the UI hidden so
-                // there's no visible flash-then-fade of the controls.
-                if (active.paused) {
+                // paused. Callers mid-crossfade pass isPlayingHint explicitly, since
+                // the global `active` reference can still point at the old (paused)
+                // element for a moment — checking active.paused there would be wrong.
+                // Callers with no ambiguity (real network recovery, plain toggles)
+                // omit it and we fall back to reading active.paused directly.
+                const isPlaying = (typeof isPlayingHint === 'boolean') ? isPlayingHint : !active.paused;
+                if (!isPlaying) {
                     ui.classList.remove('ui-hidden');
                 }
             }
@@ -678,11 +691,22 @@
         db.ref('lastSentTime').on('value', snap => {
             remoteLastSentTime = snap.val() || 0;
         });
+
+        // Firebase's .on('value') always fires once immediately with whatever is
+        // currently stored the moment you attach the listener — that's not a new
+        // signal, it's just old data replaying (e.g. from a past test, or from
+        // before this refresh). Only a push that arrives AFTER that first replay
+        // counts as a genuinely new remote input and is allowed to override.
+        let currentVideoReplayed = false;
         db.ref('currentVideo').on('value', snap => {
+            if (!currentVideoReplayed) {
+                currentVideoReplayed = true;
+                return; // ignore — this is old/stored data, not a new signal
+            }
             if (!snap.val()) return;
-            // The remote always wins, at any stage of a local tap routine — and it
-            // disarms local tap-routing entirely. A tap won't be read as routing input
-            // again until the corner double-tap re-arms it.
+            // A genuinely new remote push: always wins, at any stage of a local tap
+            // routine, and disarms local tap-routing. A tap won't be read as routing
+            // input again until the corner double-tap re-arms it.
             armed = false;
             stage = 0; route1 = null; route2 = null;
             inputsLocked = false;
