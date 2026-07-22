@@ -542,7 +542,15 @@
             const ui = document.getElementById('uiOverlay');
             if (bool) {
                 overlay.style.display = 'flex';
+                // Hide instantly, bypassing the CSS 0.3s opacity transition. Right
+                // before a routing tap the button is genuinely visible (paused, on
+                // purpose) — if we let the normal fade animate it out, a FAST buffer
+                // can finish and reveal the frame while that fade is still mid-way,
+                // exposing a partially-visible button for a moment.
+                ui.style.transition = 'none';
                 ui.classList.add('ui-hidden');
+                void ui.offsetHeight; // force layout so the instant hide applies now
+                ui.style.transition = ''; // restore the normal 0.3s fade for later use
             } else {
                 overlay.style.display = 'none';
                 // Only show the play button/progress bar if the video is genuinely
@@ -728,4 +736,3 @@
     </script>
 </body>
 </html>
-
