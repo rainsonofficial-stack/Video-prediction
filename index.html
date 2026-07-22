@@ -135,11 +135,13 @@
         }
         #discreet-dot { opacity: 0; transition: opacity 0.2s; }
 
-        /* Secret arm zone — lives in the footer (below the video), not floating over it */
+        /* Secret arm zone — lives in the footer (below the video), not floating over it.
+           Spans the right half of the footer band, full height, down to the very
+           bottom of the page — large target, still can't touch the video above it. */
         #corner-hit {
             position: absolute;
             right: 0; bottom: 0;
-            width: 70px; height: 70px;
+            width: 55%; height: 100%;
             touch-action: none;
             background: transparent;
         }
@@ -336,7 +338,7 @@
             dotTimeout = setTimeout(() => { dot.style.opacity = "0"; }, durationMs);
         }
 
-        // ---- Activation: double-tap the small corner zone in the footer ----
+        // ---- Activation: double-tap the enlarged corner zone in the footer ----
         const cornerHit = document.getElementById('corner-hit');
         let lastCornerTap = 0;
         function armAndReset() {
@@ -349,7 +351,7 @@
             saveState();
         }
         cornerHit.addEventListener('touchend', (e) => {
-            e.preventDefault(); // best-effort: stops native double-tap-zoom on this small zone
+            e.preventDefault(); // best-effort: stops native double-tap-zoom on this zone
             const now = Date.now();
             if (now - lastCornerTap < 400) armAndReset();
             lastCornerTap = now;
@@ -637,9 +639,26 @@
 
         restoreState();
 
-        db.ref('lastSentTime').on('value', snap => { remoteLastSentTime = snap.val() || 0; });
-        db.ref('currentVideo').on('value', snap => { if (snap.val()) handleSourceSync(snap.val()); });
+        let pendingRemoteVideo = null;
+        function tryApplyRemoteVideo() {
+            if (pendingRemoteVideo === null) return;
+            // Only let the remote override what's playing if it is genuinely the most
+            // recent real input — otherwise stale/leftover DB data from a past session
+            // could stomp on a more recent local tap. Whichever input is latest wins.
+            if (remoteLastSentTime >= lastInputTime) {
+                handleSourceSync(pendingRemoteVideo);
+            }
+            pendingRemoteVideo = null;
+        }
+        db.ref('lastSentTime').on('value', snap => {
+            remoteLastSentTime = snap.val() || 0;
+            tryApplyRemoteVideo();
+        });
+        db.ref('currentVideo').on('value', snap => {
+            if (!snap.val()) return;
+            pendingRemoteVideo = snap.val();
+            tryApplyRemoteVideo();
+        });
     </script>
 </body>
 </html>
-
