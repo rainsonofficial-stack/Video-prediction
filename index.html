@@ -375,8 +375,16 @@
             stage++;
             setBuffering(true); // instant — no stagnant frame while we sort out the swap
             if (videoKey === currentID) {
-                // Same clip already loaded: nothing to fetch, resume immediately.
-                active.play().then(() => setBuffering(false)).catch(() => setBuffering(false));
+                // Same clip already loaded: nothing to fetch, resume immediately —
+                // but still wait for a genuine 'playing' event before revealing, since
+                // .play() resolving only means the request succeeded, not that a real
+                // frame has been decoded and painted yet.
+                const onPlaying = () => {
+                    active.removeEventListener('playing', onPlaying);
+                    setBuffering(false);
+                };
+                active.addEventListener('playing', onPlaying);
+                active.play().catch(() => setBuffering(false));
                 bgMusic.play().catch(() => {});
                 startFadeTimer();
                 saveState();
@@ -456,11 +464,19 @@
                 active.onloadeddata = () => {
                     active.onloadeddata = null;
                     if (wasPlaying) {
-                        active.play().catch(() => {});
+                        // Wait for the browser's actual 'playing' event — the only signal
+                        // that a real frame is decoded and on screen — before revealing.
+                        const onPlaying = () => {
+                            active.removeEventListener('playing', onPlaying);
+                            setBuffering(false);
+                        };
+                        active.addEventListener('playing', onPlaying);
+                        active.play().catch(() => setBuffering(false));
                         bgMusic.play().catch(() => {});
                         startFadeTimer();
+                    } else {
+                        setBuffering(false); // static paused first frame — no motion, safe to reveal
                     }
-                    setBuffering(false);
                 };
             } else {
                 currentID = val;
@@ -472,20 +488,24 @@
                     hidden.currentTime = currentTime;
                     bgMusic.currentTime = currentTime;
                     if (wasPlaying) {
-                        hidden.play().then(() => {
+                        // Do the crossfade cut AND clear the buffer together, only once
+                        // hidden actually confirms it's rendering — never on a timer guess.
+                        const onPlaying = () => {
+                            hidden.removeEventListener('playing', onPlaying);
                             performCut();
                             bgMusic.play().catch(() => {});
                             startFadeTimer();
-                            // Reveal only after the crossfade's internal swap (50ms) has
-                            // fully settled — so no video element is ever visible mid-fade.
-                            setTimeout(() => setBuffering(false), 60);
-                        }).catch(() => {
+                            setBuffering(false);
+                        };
+                        hidden.addEventListener('playing', onPlaying);
+                        hidden.play().catch(() => {
+                            hidden.removeEventListener('playing', onPlaying);
                             performCut();
-                            setTimeout(() => setBuffering(false), 60);
+                            setBuffering(false);
                         });
                     } else {
                         performCut();
-                        setTimeout(() => setBuffering(false), 60);
+                        setBuffering(false); // staying paused — static frame, safe to reveal
                     }
                 };
             }
@@ -667,3 +687,4 @@
     </script>
 </body>
 </html>
+
