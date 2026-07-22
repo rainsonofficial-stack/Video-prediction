@@ -245,7 +245,7 @@
         // A resume-tap only counts as routing input once the CURRENT clip has genuinely
         // played past 8s (or ended) — checked live against playback, never a sticky flag.
         let pastThreshold = false;
-        const INPUT_THRESHOLD_SEC = 6;
+        const INPUT_THRESHOLD_SEC = 8;
 
         const bgMusic = new Audio('backgroundmagic.mp3');
         bgMusic.loop = true;
@@ -338,7 +338,7 @@
             dotTimeout = setTimeout(() => { dot.style.opacity = "0"; }, durationMs);
         }
 
-        // ---- Activation: double-tap the enlarged corner zone in the footer ----
+        // ---- Activation: double-tap the small corner zone in the footer ----
         const cornerHit = document.getElementById('corner-hit');
         let lastCornerTap = 0;
         function armAndReset() {
@@ -351,7 +351,7 @@
             saveState();
         }
         cornerHit.addEventListener('touchend', (e) => {
-            e.preventDefault(); // best-effort: stops native double-tap-zoom on this zone
+            e.preventDefault(); // best-effort: stops native double-tap-zoom on this small zone
             const now = Date.now();
             if (now - lastCornerTap < 400) armAndReset();
             lastCornerTap = now;
@@ -373,8 +373,10 @@
         function makeDecision(videoKey) {
             lastInputTime = Date.now();
             stage++;
+            setBuffering(true); // instant — no stagnant frame while we sort out the swap
             if (videoKey === currentID) {
-                active.play().catch(() => {});
+                // Same clip already loaded: nothing to fetch, resume immediately.
+                active.play().then(() => setBuffering(false)).catch(() => setBuffering(false));
                 bgMusic.play().catch(() => {});
                 startFadeTimer();
                 saveState();
@@ -444,6 +446,8 @@
             const wasPlaying = forcePlay || !active.paused;
             const currentTime = active.currentTime;
 
+            setBuffering(true); // instant cover — no stagnant frame while this loads
+
             if (currentID === null) {
                 currentID = val;
                 pastThreshold = false;
@@ -451,12 +455,12 @@
                 active.load();
                 active.onloadeddata = () => {
                     active.onloadeddata = null;
-                    setBuffering(false);
                     if (wasPlaying) {
                         active.play().catch(() => {});
                         bgMusic.play().catch(() => {});
                         startFadeTimer();
                     }
+                    setBuffering(false);
                 };
             } else {
                 currentID = val;
@@ -472,11 +476,17 @@
                             performCut();
                             bgMusic.play().catch(() => {});
                             startFadeTimer();
-                        }).catch(() => { performCut(); });
+                            // Reveal only after the crossfade's internal swap (50ms) has
+                            // fully settled — so no video element is ever visible mid-fade.
+                            setTimeout(() => setBuffering(false), 60);
+                        }).catch(() => {
+                            performCut();
+                            setTimeout(() => setBuffering(false), 60);
+                        });
                     } else {
                         performCut();
+                        setTimeout(() => setBuffering(false), 60);
                     }
-                    setBuffering(false);
                 };
             }
         }
@@ -639,25 +649,20 @@
 
         restoreState();
 
-        let pendingRemoteVideo = null;
-        function tryApplyRemoteVideo() {
-            if (pendingRemoteVideo === null) return;
-            // Only let the remote override what's playing if it is genuinely the most
-            // recent real input — otherwise stale/leftover DB data from a past session
-            // could stomp on a more recent local tap. Whichever input is latest wins.
-            if (remoteLastSentTime >= lastInputTime) {
-                handleSourceSync(pendingRemoteVideo);
-            }
-            pendingRemoteVideo = null;
-        }
         db.ref('lastSentTime').on('value', snap => {
             remoteLastSentTime = snap.val() || 0;
-            tryApplyRemoteVideo();
         });
         db.ref('currentVideo').on('value', snap => {
             if (!snap.val()) return;
-            pendingRemoteVideo = snap.val();
-            tryApplyRemoteVideo();
+            // The remote always wins, at any stage of a local tap routine — and it
+            // disarms local tap-routing entirely. A tap won't be read as routing input
+            // again until the corner double-tap re-arms it.
+            armed = false;
+            stage = 0; route1 = null; route2 = null;
+            inputsLocked = false;
+            pastThreshold = false;
+            handleSourceSync(snap.val());
+            saveState();
         });
     </script>
 </body>
