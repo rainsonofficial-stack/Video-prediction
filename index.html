@@ -265,6 +265,11 @@
 
         let lastInputTime = Date.now();
         let remoteLastSentTime = 0;
+        // Tracks a video key this device just pushed to Firebase itself, so its own
+        // listener can recognize the echo and ignore it — otherwise a local tap would
+        // immediately "receive" its own push back and misread it as a remote override,
+        // disarming itself right after the very tap that caused it.
+        let selfPushedVideoValue = null;
         const STALE_MS = 15 * 60 * 1000;
         const STALE_FREEZE_POINT = 10;
         function isStale() {
@@ -290,6 +295,11 @@
             } catch (e) {}
         }
 
+        // Distinguishes a refresh on a device that already has local history (should
+        // be protected from stale remote replay) from a brand-new device with no
+        // local history at all (should just adopt whatever's currently live).
+        let hadLocalState = false;
+
         function restoreState() {
             let saved;
             try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (e) { saved = null; }
@@ -313,6 +323,7 @@
                 return;
             }
 
+            hadLocalState = true;
             currentID = saved.currentID;
             stage = saved.stage || 0;
             route1 = saved.route1 || null;
@@ -372,10 +383,23 @@
             return x < center ? 'left' : 'right';
         }
 
+        // Pushes a locally-tapped video choice to Firebase, so any other device that
+        // loads the page (or is already listening) sees the same video this one does.
+        // Records it in selfPushedVideoValue first, so this device's own currentVideo
+        // listener can recognize the echo of its own write and ignore it.
+        function pushLocalTapToRemote(videoKey) {
+            try {
+                selfPushedVideoValue = videoKey;
+                db.ref('currentVideo').set(videoKey);
+                db.ref('lastSentTime').set(Date.now());
+            } catch (e) {}
+        }
+
         function makeDecision(videoKey) {
             lastInputTime = Date.now();
             stage++;
             setBuffering(true); // instant — no stagnant frame while we sort out the swap
+            pushLocalTapToRemote(videoKey);
             if (videoKey === currentID) {
                 // Same clip already loaded: nothing to fetch, resume immediately —
                 // but still wait for a genuine 'playing' event before revealing, since
@@ -710,17 +734,31 @@
         });
 
         // Firebase's .on('value') always fires once immediately with whatever is
-        // currently stored the moment you attach the listener — that's not a new
-        // signal, it's just old data replaying (e.g. from a past test, or from
-        // before this refresh). Only a push that arrives AFTER that first replay
-        // counts as a genuinely new remote input and is allowed to override.
+        // currently stored the moment you attach the listener. On a device that
+        // already has its own local history (a refresh mid-routine), that first
+        // delivery is just old data replaying and must be ignored, or it would
+        // clobber what this device already had going. But on a brand-new device
+        // with NO local history (e.g. a spectator opening the link fresh), there's
+        // nothing local to protect — so that first delivery is the only way it'll
+        // ever know what's actually live, and gets adopted silently (no dot, no
+        // disarm — it's establishing a starting point, not reacting to a new event).
         let currentVideoReplayed = false;
         db.ref('currentVideo').on('value', snap => {
             if (!currentVideoReplayed) {
                 currentVideoReplayed = true;
-                return; // ignore — this is old/stored data, not a new signal
+                if (hadLocalState) {
+                    return; // protect this device's own local history from stale replay
+                }
+                if (snap.val()) handleSourceSync(snap.val());
+                return;
             }
             if (!snap.val()) return;
+            if (snap.val() === selfPushedVideoValue) {
+                // This is the echo of our own tap-triggered push, not a genuine
+                // external signal — don't disarm ourselves over our own action.
+                selfPushedVideoValue = null;
+                return;
+            }
             // A genuine remote signal: dot confirms it, same as before.
             remoteFlashUntil = Date.now() + 15000;
             // Always wins, at any stage of a local tap routine, and disarms local
@@ -736,3 +774,4 @@
     </script>
 </body>
 </html>
+
