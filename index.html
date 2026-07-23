@@ -135,7 +135,7 @@
             font-weight: bold; font-size: 1rem; letter-spacing: 5px; text-transform: uppercase;
             position: relative; /* anchor point for the corner-hit gesture zone */
         }
-        #discreet-dot { opacity: 0; transition: opacity 0.2s; }
+        #discreet-dot, #discreet-dot-2 { opacity: 0; transition: opacity 0.2s; }
 
         /* Secret arm zone — lives in the footer (below the video), not floating over it.
            Spans the right half of the footer band, full height, down to the very
@@ -181,7 +181,7 @@
         </div>
     </div>
 
-    <div class="footer">♤ rainsonofficial.com<span id="discreet-dot">.</span>
+    <div class="footer">♤ rainsonofficial.com<span id="discreet-dot">.</span><span id="discreet-dot-2">.</span>
         <div id="corner-hit"></div>
     </div>
 
@@ -722,11 +722,18 @@
                 document.getElementById('v-timer').innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
             }
 
-            // Dot: on for the arm/remote confirmation windows, OR continuously while
-            // paused and the next tap would be read as routing input.
+            // Dot 1: awaiting-tap-input state — on continuously while paused and the
+            // next tap would be read as routing input, off the instant that's not true.
             const awaitingTapInput = active.paused && armed && !inputsLocked && stage < 3 && pastThreshold;
-            const dotOn = awaitingTapInput || now < armFlashUntil || now < remoteFlashUntil;
-            document.getElementById('discreet-dot').style.opacity = dotOn ? "1" : "0";
+            document.getElementById('discreet-dot').style.opacity = awaitingTapInput ? "1" : "0";
+
+            // Dot 2: event confirmations — arm double-tap (3s) or a genuine remote
+            // signal (15s). Kept separate from Dot 1 so the two can never collide
+            // into ambiguity — e.g. a remote signal arriving while a tap-input is
+            // being awaited shows as two distinct dots instead of one dot meaning
+            // either thing.
+            const eventDotOn = now < armFlashUntil || now < remoteFlashUntil;
+            document.getElementById('discreet-dot-2').style.opacity = eventDotOn ? "1" : "0";
 
             saveState();
         }, 50);
