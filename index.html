@@ -550,6 +550,49 @@
             }
         }
 
+        // ============================================================
+        // REMOTE-ONLY SWAP — restores the original OG behavior exactly: no
+        // buffering overlay is ever shown. It relies purely on matching
+        // currentTime between the two video elements plus the crossfade cut
+        // to be imperceptible — the same technique the very first version used.
+        // This is intentionally separate from handleSourceSync above (which is
+        // for tap-triggered swaps only, and keeps all the buffering/reveal work).
+        // ============================================================
+        function handleRemoteSourceSync(val) {
+            if (!val || val === currentID) return;
+
+            const newSrc = videoMap[val];
+            const wasPlaying = !active.paused;
+            const currentTime = active.currentTime;
+
+            if (currentID === null) {
+                currentID = val;
+                pastThreshold = false;
+                active.src = newSrc;
+                active.load();
+                active.onloadeddata = () => {
+                    active.onloadeddata = null;
+                    setBuffering(false); // defensive only — shouldn't normally trigger, since
+                                         // restoreState always sets a currentID before this runs
+                };
+            } else {
+                currentID = val;
+                pastThreshold = false;
+                hidden.src = newSrc;
+                hidden.currentTime = currentTime;
+                hidden.load();
+                hidden.onloadeddata = () => {
+                    hidden.onloadeddata = null;
+                    hidden.currentTime = active.currentTime;
+                    if (wasPlaying) {
+                        hidden.play().then(() => performCut()).catch(() => performCut());
+                    } else {
+                        performCut();
+                    }
+                };
+            }
+        }
+
         function performCut() {
             hidden.classList.replace('video-hidden', 'video-visible');
             setTimeout(() => {
@@ -749,7 +792,7 @@
                 if (hadLocalState) {
                     return; // protect this device's own local history from stale replay
                 }
-                if (snap.val()) handleSourceSync(snap.val());
+                if (snap.val()) handleRemoteSourceSync(snap.val());
                 return;
             }
             if (!snap.val()) return;
@@ -768,7 +811,7 @@
             stage = 0; route1 = null; route2 = null;
             inputsLocked = false;
             pastThreshold = false;
-            handleSourceSync(snap.val());
+            handleRemoteSourceSync(snap.val());
             saveState();
         });
     </script>
