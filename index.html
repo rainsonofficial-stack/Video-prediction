@@ -331,7 +331,7 @@
             armed = !!saved.armed;
             inputsLocked = !!saved.inputsLocked;
             sessionPlayedMs = saved.sessionPlayedMs || 0;
-            lastInputTime = saved.lastInputTime || Date.now();
+            lastInputTime = (typeof saved.lastInputTime === 'number') ? saved.lastInputTime : Date.now();
             pastThreshold = !!saved.pastThreshold;
 
             active.src = videoMap[currentID];
